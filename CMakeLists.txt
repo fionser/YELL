@@ -22,3 +22,6 @@ include_directories(include/)
 file(GLOB YELL_ASMC lib/prng/*.s)
 file(GLOB YELL_SRC lib/prng/*.cpp lib/*.cpp lib/prng/*.s)
 add_library(yell STATIC ${YELL_SRC} ${YELL_ASMC})
+
+add_executable(example example.cpp)
+target_link_libraries(example yell gmp mpfr)

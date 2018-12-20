@@ -43,6 +43,8 @@ class poly {
   static_assert(degree_ < yell::params::kMaxPolyDegree, "");
   static_assert(nmoduli_ < yell::params::kMaxNbModuli, "");
   std::array<params::value_type *, nmoduli_> _data;
+  params::value_type** raw_data() { return _data.data(); }
+  params::value_type* const* raw_data() const { return _data.data(); }
 #ifdef USE_MEM_POOL
   static boost::pool<> _mem_pool; // memory pool.
 #endif
@@ -93,8 +95,6 @@ public:
                                           const poly<degree_, nmoduli_>& op1);
   void negate();
   
-  void automorphism_inplace(const size_t k);
-
   /* polynomial indexing
    */
   value_type const& operator()(size_t cm, size_t i) const { 
@@ -114,15 +114,41 @@ public:
   void backward();
   /* misc
    */
-  value_type** raw_data() { return _data.data(); }
-  value_type* const* raw_data() const { return _data.data(); }
 
   value_type get_modulus(size_t cm) { assert(cm < nmoduli); return params::P[cm]; }
 
   void clear();
 
   constexpr size_t size() const { return sizeof(_data); }
-  /* The caller should clean up the mpz_t array.
+  /* Recasting
+   */
+  template <size_t HEAD> 
+  poly<degree, HEAD>* take_head_moduli() {
+    static_assert(HEAD <= nmoduli, "");
+    return reinterpret_cast<poly<degree, HEAD> *>(raw_data());
+  }
+
+  template <size_t HEAD> 
+  const poly<degree, HEAD>* take_head_moduli() const {
+    static_assert(HEAD <= nmoduli, "");
+    return reinterpret_cast<poly<degree, HEAD> *>(raw_data());
+  }
+
+  template <size_t TAIL> 
+  poly<degree, TAIL>* take_tail_moduli() {
+    static_assert(TAIL <= nmoduli, "");
+    return reinterpret_cast<poly<degree, TAIL> *>(raw_data() + (nmoduli - TAIL));
+  }
+
+  template <size_t TAIL> 
+  const poly<degree, TAIL>* take_tail_moduli() const {
+    static_assert(TAIL <= nmoduli, "");
+    return reinterpret_cast<poly<degree, TAIL> *>(raw_data() + (nmoduli - TAIL));
+  }
+
+  void check_vaild_range() const;
+  /* GMP
+   * The caller should clean up the mpz_t array.
    */
   std::array<mpz_t, degree_> poly2mpz() const;
 };
@@ -132,34 +158,6 @@ public:
 template<size_t Degree, size_t NbModuli>
 std::ostream& operator<<(std::ostream& os, 
                          yell::poly<Degree, NbModuli> const& p);
-
-/* Recasting. Caller should know the memory layout of poly 
-   which is just the concatnation of "nmoduli" moduli with "degree" coefficients each: 
-   [moduli 1 || moduli 2 || .... || moduli L]
-*/
-template <size_t L0, size_t degree, size_t nmoduli>
-poly<degree, L0>* take_head_moduli(poly<degree, nmoduli> &op) {
-  static_assert(L0 <= nmoduli, "");
-  return reinterpret_cast<poly<degree, L0> *>(op.raw_data());
-}
-
-template <size_t L0, size_t degree, size_t nmoduli>
-const poly<degree, L0>* take_head_moduli(poly<degree, nmoduli> const& op) {
-  static_assert(L0 <= nmoduli, "");
-  return reinterpret_cast<const poly<degree, L0> *>(op.raw_data());
-}
-
-template <size_t L0, size_t degree, size_t nmoduli>
-poly<degree, L0>* take_tail_moduli(poly<degree, nmoduli> &op) {
-  static_assert(L0 <= nmoduli, "");
-  return reinterpret_cast<poly<degree, L0> *>(op.raw_data() + (nmoduli - L0));
-}
-
-template <size_t L0, size_t degree, size_t nmoduli>
-const poly<degree, L0>* take_tail_moduli(poly<degree, nmoduli> const& op) {
-  static_assert(L0 <= nmoduli, "");
-  return reinterpret_cast<const poly<degree, L0> *>(op.raw_data() + (nmoduli - L0));
-}
 
 template <typename value_type, size_t degree>
 struct ArrayPointer {

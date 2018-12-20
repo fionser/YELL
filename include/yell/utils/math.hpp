@@ -7,9 +7,9 @@ namespace math {
 template <typename T>
 T inv_mod_prime(T a, size_t cm)
 {
-  nfl::ops::mulmod mulmod;
+  yell::ops::mulmod mulmod;
   T ret{1};
-  T y = nfl::params::P[cm] - 2;
+  T y = yell::params::P[cm] - 2;
   while (y > 0) {
     if (y & 1)
       ret = mulmod(ret, a, cm);

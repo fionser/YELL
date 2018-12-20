@@ -13,7 +13,7 @@
 #ifdef USE_MEM_POOL
 #include <boost/pool/pool.hpp>
 template<size_t degree, size_t nmoduli>
-boost::pool<> nfl::poly<degree, nmoduli>::_mem_pool(degree * sizeof(value_type));
+boost::pool<> yell::poly<degree, nmoduli>::_mem_pool(degree * sizeof(value_type));
 #define ALLOC_MEM(bytes) _mem_pool.malloc()
 #define RELEASE_MEM(ptr) _mem_pool.free(ptr)
 #else
@@ -104,7 +104,7 @@ template<size_t degree_, size_t nmoduli_> poly<degree_, nmoduli_>&
 poly<degree_, nmoduli_>::add_product_of(const poly<degree_, nmoduli_>& op0, 
                                         const poly<degree_, nmoduli_>& op1)
 {
-  nfl::ops::muladd muladd;
+  ops::muladd muladd;
   for (size_t cm = 0; cm < nmoduli_; ++cm) {
     auto dst  = ptr_at(cm);
     auto op0_ = op0.cptr_at(cm);
@@ -124,25 +124,6 @@ void poly<degree_, nmoduli_>::negate() {
   }
 }
 
-template <size_t degree_, size_t nmoduli_>
-void poly<degree_, nmoduli_>::automorphism_inplace(const size_t k) {
-  assert((k & 1) && k < 2 * degree_);
-  if (k == 1) 
-    return;
-  const size_t mod_mask = ((2 << logn) - 1);
-  for (size_t cm = 0; cm < nmoduli_; ++cm) {
-    std::array<value_type, degree_> tmp;
-    auto src_ptr = cptr_at(cm);
-    for (size_t d = 0; d < degree_; ++d) {
-      uint64_t reversed = math::reverse_bits(d, logn);
-      uint64_t index_raw = k * (2 * reversed + 1);
-      index_raw &= mod_mask;
-      tmp[d] = src_ptr[math::reverse_bits((index_raw - 1) >> 1, logn)];
-    }
-    std::memcpy(ptr_at(cm), tmp.begin(), sizeof(tmp));
-  }
-}
-
 // ********************
 // GMP
 // ********************
@@ -156,24 +137,18 @@ std::array<mpz_t, degree_> poly<degree_, nmoduli_>::poly2mpz() const {
 // ****************************************************
 template<size_t degree, size_t nmoduli>
 void poly<degree, nmoduli>::forward() {
-#pragma omp parallel num_threads(4)
-#pragma omp for 
-    for (size_t cm = 0; cm < nmoduli; ++cm)
-      ntt<degree>::forward(ptr_at(cm), cm);
+  for (size_t cm = 0; cm < nmoduli; ++cm)
+    ntt<degree>::forward(ptr_at(cm), cm);
 }
 
 template<size_t degree, size_t nmoduli>
 void poly<degree, nmoduli>::forward_lazy() {
-#pragma omp parallel num_threads(4)
-#pragma omp for
   for (size_t cm = 0; cm < nmoduli; ++cm) 
     ntt<degree>::forward_lazy(ptr_at(cm), cm);
 }
  
 template<size_t degree, size_t nmoduli>
 void poly<degree, nmoduli>::backward() {
-#pragma omp parallel num_threads(4)
-#pragma omp for
   for (size_t cm = 0; cm < nmoduli; ++cm)
     ntt<degree>::backward(ptr_at(cm), cm);
 }
@@ -217,13 +192,7 @@ void poly<degree, nmoduli>::set(uniform const &) {
     }
   }
 
-#ifdef DEVELOP_CHECK
-  for (size_t cm = 0; cm < nmoduli; ++cm) {
-    auto _ptr = cptr_at(cm);
-    for (size_t d = 0; d < degree; ++d)
-      assert(*_ptr++ < get_modulus(cm));
-  }
-#endif
+  check_vaild_range();
 }
 
 template<size_t degree, size_t nmoduli>
@@ -235,13 +204,6 @@ poly<degree, nmoduli>::poly(gaussian<in_class, _lu_depth> const& mode) : poly<de
 template<size_t degree, size_t nmoduli>
 template<class in_class, unsigned _lu_depth>
 void poly<degree, nmoduli>::set(gaussian<in_class, _lu_depth> const& mode) {
-#ifndef NDEBUG
-#ifdef NOISE_FREE
-  clear();
-  return;
-#endif
-#endif
-
   uint64_t const amplifier = mode.amplifier;
 
   // We play with the rnd pointer (in the uniform case), and thus
@@ -261,13 +223,8 @@ void poly<degree, nmoduli>::set(gaussian<in_class, _lu_depth> const& mode) {
     for (auto r : rnd)
       *dst++ = r < 0 ? p + r : r;
   }
-#ifdef DEVELOP_CHECK
-  for (size_t cm = 0; cm < nmoduli; ++cm) {
-    auto _ptr = cptr_at(cm);
-    for (size_t d = 0; d < degree; ++d)
-      assert(*_ptr++ < get_modulus(cm));
-  }
-#endif
+
+  check_vaild_range();
 }
 
 template<size_t degree, size_t nmoduli>
@@ -286,13 +243,8 @@ void poly<degree, nmoduli>::set(ZO_dist const& mode) {
     for (auto r : rnd)
       *dst++ = r <= mode.rho ? (r & 2) ? p_min_1 : 1U : 0U;
   }
-#ifdef DEVELOP_CHECK
-  for (size_t cm = 0; cm < nmoduli; ++cm) {
-    auto _ptr = cptr_at(cm);
-    for (size_t d = 0; d < degree; ++d)
-      assert(*_ptr++ < get_modulus(cm));
-  }
-#endif
+
+  check_vaild_range();
 }
 
 template<size_t degree, size_t nmoduli>
@@ -342,13 +294,7 @@ void poly<degree, nmoduli>::set(hwt_dist const& mode) {
       dst[pos] = ((*rnd_ptr++) & 2) ? 1 : p_min_1; // {-1, 1}
   }
   std::memset(hitted.data(), 0x0, hitted.size() * sizeof(size_t)); // erase from memory
-#ifdef DEVELOP_CHECK
-  for (size_t cm = 0; cm < nmoduli; ++cm) {
-    auto _ptr = cptr_at(cm);
-    for (size_t d = 0; d < degree; ++d)
-      assert(*_ptr++ < get_modulus(cm));
-  }
-#endif
+  check_vaild_range();
 }
 
 // *********************************************************
@@ -373,4 +319,18 @@ std::ostream& operator<<(std::ostream& outs, poly<degree, nmoduli> const& p)
   outs << "}";
   return outs;
 }
-} // namespace nfl
+
+template<size_t degree, size_t nmoduli>
+void poly<degree, nmoduli>::check_vaild_range() const {
+#ifndef NDEBUG
+  for (size_t cm = 0; cm < nmoduli; ++cm) {
+    auto ptr = cptr_at(cm);
+    auto end = cptr_end(cm);
+    auto p = yell::params::P[cm];
+    while (ptr != end) 
+      assert(*ptr++ < p);
+  }
+#endif
+}
+
+} // namespace yell

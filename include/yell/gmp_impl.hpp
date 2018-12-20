@@ -10,7 +10,7 @@ gmp::gmp_precomputed::gmp_precomputed(size_t nmoduli)
 {
   mpz_init_set_ui(moduli_product_, 1);
   for (size_t j = 0; j < nmoduli; j++) {
-    T p = yeall::params::P[j];
+    T p = yell::params::P[j];
     mpz_mul_ui(moduli_product_, moduli_product_, p);
   }
 
