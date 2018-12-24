@@ -178,12 +178,12 @@ recast_as_array(yell::poly<degree, nmoduli> const& op, size_t cm) {
   return reinterpret_cast<typename ArrayPointer<yell::params::value_type, degree>::cT>(op.cptr_at(cm));
 }
 
-DECLARE_BINARY_OPERATOR(operator*, mulmod);
-DECLARE_BINARY_OPERATOR(operator+, addmod);
-DECLARE_BINARY_OPERATOR(operator-, submod);
-DECLARE_SELF_BINARY_OPERATOR(operator*=, mulmod);
-DECLARE_SELF_BINARY_OPERATOR(operator+=, addmod);
-DECLARE_SELF_BINARY_OPERATOR(operator-=, submod);
+YELL_BINARY_OPERATOR(operator*, mulmod);
+YELL_BINARY_OPERATOR(operator+, addmod);
+YELL_BINARY_OPERATOR(operator-, submod);
+YELL_SELF_BINARY_OPERATOR(operator*=, mulmod);
+YELL_SELF_BINARY_OPERATOR(operator+=, addmod);
+YELL_SELF_BINARY_OPERATOR(operator-=, submod);
 
 } // namespace yell
 

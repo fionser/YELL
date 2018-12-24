@@ -2,7 +2,7 @@
 #include "yell/params.hpp"
 #include <type_traits>
 namespace yell {
-#define DECLARE_BINARY_OPERATOR(Op, Name) \
+#define YELL_BINARY_OPERATOR(Op, Name) \
 template<size_t degree, size_t nmoduli> \
 poly<degree, nmoduli> Op(poly<degree, nmoduli> const& op0, \
                          poly<degree, nmoduli> const& op1) {\
@@ -17,7 +17,7 @@ poly<degree, nmoduli> Op(poly<degree, nmoduli> const& op0, \
   return rop; \
 }
 
-#define DECLARE_SELF_BINARY_OPERATOR(Op, Name) \
+#define YELL_SELF_BINARY_OPERATOR(Op, Name) \
 template<size_t degree, size_t nmoduli> \
 poly<degree, nmoduli>& Op(poly<degree, nmoduli> &op0, \
                           poly<degree, nmoduli> const& op1) {\

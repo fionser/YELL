@@ -7,29 +7,6 @@ template<size_t degree> ntt<degree> ntt<degree>::instance_;
 
 struct ntt_loop_body;
 
-inline unsigned char add_uint64_generic(uint64_t operand1, 
-                                        uint64_t operand2,
-                                        unsigned char carry, 
-                                        uint64_t * result)
-{
-  operand1 += operand2;
-  *result = operand1 + carry;
-  return (operand1 < operand2) || (~operand1 < carry);
-}
-
-static params::value_type div2mod(params::value_type x, size_t cm)
-{
-  if (x & 1) {
-    params::value_type temp;
-    int carry = add_uint64_generic(x, params::P[cm], 0, &temp);
-    x = temp >> 1u;
-    if (carry)
-      return x | (params::value_type(1) << (params::kModulusRepresentationBitsize - 1));
-    return x;
-  }
-  return x >> 1u;
-}
-
 template <size_t degree>
 void ntt<degree>::ntt_precomputed::init(size_t cm) {
   assert(cm < params::kMaxNbModuli);
@@ -204,10 +181,10 @@ struct ntt_loop_body {
   using value_type = params::value_type;
   using signed_type = params::signed_type;
   using gt_value_type = params::gt_value_type;
-  const value_type p;
+  const value_type p, _2p;
   const std::array<value_type, 2> mod_correct_table;
 
-  explicit ntt_loop_body(value_type const p) : p(p), mod_correct_table({p * 2, 0}) {}
+  explicit ntt_loop_body(value_type const p) : p(p), _2p(p * 2), mod_correct_table({p * 2, 0}) {}
 
   //! x'0 = x0 + x1 mod p
   //! x'1 = w * (x0 - x1) mod p
@@ -215,19 +192,19 @@ struct ntt_loop_body {
   //! Ensure:  0 < x'0, x'1 < 2 * p
   inline void gs_bufferfly(value_type* x0, 
                            value_type* x1, 
-                           value_type const *w, 
-                           value_type const *wprime) const
+                           value_type const w, 
+                           value_type const wprime) const
   {
     value_type u0 = *x0;
     value_type u1 = *x1;
 
     value_type t0 = u0 + u1;
-    t0 -= mod_correct_table[t0 < p * 2]; // if (t0 >= _2p) t0 -= 2p;
-    value_type t1 = u0 - u1 + p * 2;
-    value_type q = ((gt_value_type) t1 * (*wprime)) >> params::kModulusRepresentationBitsize;
+    t0 -= mod_correct_table[t0 < _2p]; // if (t0 >= _2p) t0 -= 2p;
+    value_type t1 = u0 - u1 + _2p;
+    value_type q = ((gt_value_type) t1 * wprime) >> params::kModulusRepresentationBitsize;
 
     *x0 = t0;
-    *x1 = t1 * (*w) - q * p;
+    *x1 = t1 * w - q * p;
   }
 
   //! x'0 = x0 + w * x1 mod p
@@ -236,18 +213,18 @@ struct ntt_loop_body {
   //! Ensure:  0 < x'0, x'1 < 4 * p
   inline void ct_bufferfly(value_type* x0, 
                            value_type* x1, 
-                           value_type const *w, 
-                           value_type const *wprime) const
+                           value_type const w, 
+                           value_type const wprime) const
   {
     value_type u0 = *x0;
     value_type u1 = *x1;
 
-    u0 -= mod_correct_table[u0 < p * 2]; // if (u0 >= 2p) u0 -= 2p;
-    value_type q = ((gt_value_type) u1 * (*wprime)) >> params::kModulusRepresentationBitsize;
-    value_type t = u1 * (*w) - q * p;
+    u0 -= mod_correct_table[u0 < _2p]; // if (u0 >= 2p) u0 -= 2p;
+    value_type q = ((gt_value_type) u1 * (wprime)) >> params::kModulusRepresentationBitsize;
+    value_type t = u1 * w - q * p;
 
     *x0 = u0 + t;
-    *x1 = u0 - t + p * 2;
+    *x1 = u0 - t + _2p;
   }
 };
 
@@ -271,13 +248,11 @@ void negacylic_forward_lazy(
         auto x0 = &x[j1];
         auto x1 = &x[j2];
         for (size_t j = j1; j != j2; j += 4) {
-          body.ct_bufferfly(x0++, x1++, w, wshoup);
-          body.ct_bufferfly(x0++, x1++, w, wshoup);
-          body.ct_bufferfly(x0++, x1++, w, wshoup);
-          body.ct_bufferfly(x0++, x1++, w, wshoup);
+          body.ct_bufferfly(x0++, x1++, w[i], wshoup[i]);
+          body.ct_bufferfly(x0++, x1++, w[i], wshoup[i]);
+          body.ct_bufferfly(x0++, x1++, w[i], wshoup[i]);
+          body.ct_bufferfly(x0++, x1++, w[i], wshoup[i]);
         }
-        ++w;
-        ++wshoup;
       }
     } else { //! last two layers
       for (size_t i = 0; i != m; ++i) {
@@ -286,9 +261,7 @@ void negacylic_forward_lazy(
         auto x0 = &x[j1];
         auto x1 = &x[j2];
         for (size_t j = j1; j != j2; ++j)
-          body.ct_bufferfly(x0++, x1++, w, wshoup);
-        ++w;
-        ++wshoup;
+          body.ct_bufferfly(x0++, x1++, w[i], wshoup[i]);
       }
     }
   }
@@ -316,13 +289,11 @@ void negacylic_backward_lazy(
         auto x1 = &x[j2];
         //! Unroll a little bit to reduce the number of branches.
         for (size_t j = j1; j != j2; j += 4) {
-          body.gs_bufferfly(x0++, x1++, w, wshoup);
-          body.gs_bufferfly(x0++, x1++, w, wshoup);
-          body.gs_bufferfly(x0++, x1++, w, wshoup);
-          body.gs_bufferfly(x0++, x1++, w, wshoup);
+          body.gs_bufferfly(x0++, x1++, w[i], wshoup[i]);
+          body.gs_bufferfly(x0++, x1++, w[i], wshoup[i]);
+          body.gs_bufferfly(x0++, x1++, w[i], wshoup[i]);
+          body.gs_bufferfly(x0++, x1++, w[i], wshoup[i]);
         }
-        ++w;
-        ++wshoup;
         j1 = j1 + (t << 1u);
       }
     } else { //! first two layers
@@ -331,9 +302,7 @@ void negacylic_backward_lazy(
         auto x0 = &x[j1];
         auto x1 = &x[j2];
         for (size_t j = j1; j != j2; ++j)
-          body.gs_bufferfly(x0++, x1++, w, wshoup);
-        ++w;
-        ++wshoup;
+          body.gs_bufferfly(x0++, x1++, w[i], wshoup[i]);
         j1 = j1 + (t << 1u);
       }
     }
