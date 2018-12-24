@@ -230,19 +230,6 @@ struct ntt_loop_body {
     *x1 = t1 * (*w) - q * p;
   }
 
-  void four_gs_butterfly(size_t j1, size_t j2,
-                         value_type* x0,
-                         value_type* x1,
-                         value_type const* w,
-                         value_type const* wprime) const 
-  {
-    for (size_t j = j1; j != j2; j += 4) {
-      gs_bufferfly(x0++, x1++, w, wprime);
-      gs_bufferfly(x0++, x1++, w, wprime);
-      gs_bufferfly(x0++, x1++, w, wprime);
-      gs_bufferfly(x0++, x1++, w, wprime);
-    }
-  }
   //! x'0 = x0 + w * x1 mod p
   //! x'1 = x0 - w * x1 mod p
   //! Require: 0 < x0, x1 < 4 * p
@@ -262,21 +249,6 @@ struct ntt_loop_body {
     *x0 = u0 + t;
     *x1 = u0 - t + p * 2;
   }
-
-  void four_ct_butterfly(size_t j1, size_t j2,
-                         value_type* x0, 
-                         value_type* x1,
-                         value_type const* w,
-                         value_type const* wprime) const 
-  {
-    for (size_t j = j1; j != j2; j += 4) {
-      ct_bufferfly(x0++, x1++, w, wprime);
-      ct_bufferfly(x0++, x1++, w, wprime);
-      ct_bufferfly(x0++, x1++, w, wprime);
-      ct_bufferfly(x0++, x1++, w, wprime);
-    }
-  }
-
 };
 
 void negacylic_forward_lazy(
@@ -298,9 +270,12 @@ void negacylic_forward_lazy(
         const size_t j2 = j1 + t;
         auto x0 = &x[j1];
         auto x1 = &x[j2];
-        body.four_ct_butterfly(j1, j2, x0, x1, w, wshoup);
-        x0 += 4u;
-        x1 += 4u;
+        for (size_t j = j1; j != j2; j += 4) {
+          body.ct_bufferfly(x0++, x1++, w, wshoup);
+          body.ct_bufferfly(x0++, x1++, w, wshoup);
+          body.ct_bufferfly(x0++, x1++, w, wshoup);
+          body.ct_bufferfly(x0++, x1++, w, wshoup);
+        }
         ++w;
         ++wshoup;
       }
@@ -340,14 +315,17 @@ void negacylic_backward_lazy(
         auto x0 = &x[j1];
         auto x1 = &x[j2];
         //! Unroll a little bit to reduce the number of branches.
-        body.four_gs_butterfly(j1, j2, x0, x1, w, wshoup);
-        x0 += 4u;
-        x1 += 4u;
+        for (size_t j = j1; j != j2; j += 4) {
+          body.gs_bufferfly(x0++, x1++, w, wshoup);
+          body.gs_bufferfly(x0++, x1++, w, wshoup);
+          body.gs_bufferfly(x0++, x1++, w, wshoup);
+          body.gs_bufferfly(x0++, x1++, w, wshoup);
+        }
         ++w;
         ++wshoup;
         j1 = j1 + (t << 1u);
       }
-    } else { //! last two layers
+    } else { //! first two layers
       for (size_t i = 0; i != h; ++i) {
         const size_t j2 = j1 + t;
         auto x0 = &x[j1];
