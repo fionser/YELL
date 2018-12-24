@@ -1,5 +1,4 @@
-#ifndef fast_gauss_noise_h
-#define fast_gauss_noise_h
+#pragma once
 
 #include <cstdint>
 #include <cstddef>
@@ -660,4 +659,3 @@ FastGaussianNoise<in_class, _lu_depth>::~FastGaussianNoise()
 
 }  // namespace yell
 
-#endif

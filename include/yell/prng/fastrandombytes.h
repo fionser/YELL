@@ -4,11 +4,8 @@
  * Public Domain
  */
 
-#ifndef FASTRANDOMBYTES_H
-#define FASTRANDOMBYTES_H
-
+#pragma once
 namespace yell {
 void fastrandombytes(unsigned char *r, unsigned long long rlen);
 }
 
-#endif
