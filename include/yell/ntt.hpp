@@ -31,13 +31,16 @@ private:
     //! phi^(2 * degree) = 1 \bmod prime[cm]
     //! invphi = phi^(-1) \bmod prime[cm]
     //! shoupXX are Shoup's trick to accelerate the multiplication reduction.
+    //! We merge the last layer of inv_ntt with the n^-1 step.
     //! Values in these tables are stored in the bit-reverse order.
-    T phis[degree],
-      shoupphis[degree],
-      invphis[degree],
-      shoupinvphis[degree],
+    T phiTbl[degree],
+      shoupPhiTbl[degree],
+      invphiTbl[degree],
+      shoupInvphiTbl[degree],
       invDegree,
-      shoupinvDegree;
+      shoupInvDegree,
+      invphiInvDegree, //! n^{-1} * invphi, used in the last layer of inv_ntt
+      shoupInvphiInvDegree;
   };
 
   sf::contention_free_shared_mutex<> guard;
@@ -54,9 +57,9 @@ public:
   /* apply forward ntt over the specified moduli
    */
   static void forward(T *op, size_t cm);
-
+  //! skip the final modulus correction step.
+  //! Result range in [0, 4 * p)
   static void forward_lazy(T *op, size_t cm);
-
   /* apply backward invntt over the specified moduli
    */
   static void backward(T* op ,size_t cm);

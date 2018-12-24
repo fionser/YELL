@@ -117,11 +117,6 @@ struct mulmod {
   inline T operator()(T x, T y, size_t cm) const 
   {
     assert(cm < params::kMaxNbModuli);
-#ifndef NDEBUG
-    auto const p = params::P[cm];
-    auto const _2p = p << 1u;
-    assert(x < _2p && y < _2p);
-#endif
     gt_value_type res = (gt_value_type) x * y;
     barret_reduction(&res, cm);
     return (T) res;
@@ -129,11 +124,6 @@ struct mulmod {
 
   inline void compute(T &x, T y, size_t cm) const {
     assert(cm < params::kMaxNbModuli);
-#ifndef NDEBUG
-    auto const p = params::P[cm];
-    auto const _2p = p << 1u;
-    assert(x < _2p && y < _2p);
-#endif
     gt_value_type res = (gt_value_type) x * y;
     barret_reduction(&res, cm);
     x = (T) res;
@@ -156,10 +146,6 @@ struct mulmod_shoup {
   {
     using gt_value_type = typename params::gt_value_type;
     auto const p = params::P[cm];
-#ifndef NDEBUG
-    auto const _2p = p << 1u;
-    assert(x < _2p && y < _2p);
-#endif
     T q = (((gt_value_type) x * yprime) >> params::kModulusRepresentationBitsize) * p;
     x = x * y - q;
     mod_correct(x, p);
