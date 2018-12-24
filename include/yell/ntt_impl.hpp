@@ -5,6 +5,29 @@
 namespace yell {
 template<size_t degree> ntt<degree> ntt<degree>::instance_;
 
+inline unsigned char add_uint64_generic(uint64_t operand1, 
+                                        uint64_t operand2,
+                                        unsigned char carry, 
+                                        uint64_t * result)
+{
+  operand1 += operand2;
+  *result = operand1 + carry;
+  return (operand1 < operand2) || (~operand1 < carry);
+}
+
+static params::value_type div2mod(params::value_type x, size_t cm)
+{
+  if (x & 1) {
+    params::value_type temp;
+    int carry = add_uint64_generic(x, params::P[cm], 0, &temp);
+    x = temp >> 1u;
+    if (carry)
+      return x | (params::value_type(1) << (params::kModulusRepresentationBitsize - 1));
+    return x;
+  }
+  return x >> 1u;
+}
+
 template <size_t degree>
 void ntt<degree>::ntt_precomputed::init(size_t cm) {
   assert(cm < params::kMaxNbModuli);
@@ -18,7 +41,8 @@ void ntt<degree>::ntt_precomputed::init(size_t cm) {
   // But first we get phi = sqrt(omega) squaring them
   // log2(X/2)-log2(degree) times
   phi = params::primitive_roots[cm];
-  for (unsigned int i = 0 ; i < static_log2<params::kMaxPolyDegree>::value - static_log2<degree>::value; i++) {
+  for (unsigned int i = 0 ; i < static_log2<params::kMaxPolyDegree>::value 
+                                - static_log2<degree>::value; i++) {
     mulmod.compute(phi, phi, cm);
   }
 
@@ -186,6 +210,19 @@ struct ntt_loop_body {
     *x1 = t1 * (*w) - q * p;
   }
 
+  void four_gs_butterfly(size_t j1, size_t j2,
+                         value_type* x0,
+                         value_type* x1,
+                         value_type const* w,
+                         value_type const* wprime) const 
+  {
+    for (size_t j = j1; j != j2; j += 4) {
+      gs_bufferfly(x0++, x1++, w, wprime);
+      gs_bufferfly(x0++, x1++, w, wprime);
+      gs_bufferfly(x0++, x1++, w, wprime);
+      gs_bufferfly(x0++, x1++, w, wprime);
+    }
+  }
   //! x'0 = x0 + w * x1 mod p
   //! x'1 = x0 - w * x1 mod p
   //! Require: 0 < x0, x1 < 4 * p
@@ -205,6 +242,21 @@ struct ntt_loop_body {
     *x0 = u0 + t;
     *x1 = u0 - t + p * 2;
   }
+
+  void four_ct_butterfly(size_t j1, size_t j2,
+                         value_type* x0, 
+                         value_type* x1,
+                         value_type const* w,
+                         value_type const* wprime) const 
+  {
+    for (size_t j = j1; j != j2; j += 4) {
+      ct_bufferfly(x0++, x1++, w, wprime);
+      ct_bufferfly(x0++, x1++, w, wprime);
+      ct_bufferfly(x0++, x1++, w, wprime);
+      ct_bufferfly(x0++, x1++, w, wprime);
+    }
+  }
+
 };
 
 void negacylic_forward_lazy(
@@ -220,19 +272,32 @@ void negacylic_forward_lazy(
     t >>= 1u;
     const params::value_type *w = &wtab[m];
     const params::value_type *wshoup = &wtab_shoup[m];
-    for (size_t i = 0; i < m; ++i) {
-      const size_t j1 = 2 * i * t;
-      const size_t j2 = j1 + t;
-      auto x0 = &x[j1];
-      auto x1 = &x[j1 + t];
-      for (size_t j = j1; j < j2; ++j)
-        body.ct_bufferfly(x0++, x1++, w, wshoup);
-      ++w;
-      ++wshoup;
+    if (t >= 4) {
+      for (size_t i = 0; i != m; ++i) {
+        const size_t j1 = 2 * i * t;
+        const size_t j2 = j1 + t;
+        auto x0 = &x[j1];
+        auto x1 = &x[j2];
+        body.four_ct_butterfly(j1, j2, x0, x1, w, wshoup);
+        x0 += 4u;
+        x1 += 4u;
+        ++w;
+        ++wshoup;
+      }
+    } else {
+      for (size_t i = 0; i != m; ++i) {
+        const size_t j1 = 2 * i * t;
+        const size_t j2 = j1 + t;
+        auto x0 = &x[j1];
+        auto x1 = &x[j2];
+        for (size_t j = j1; j != j2; ++j)
+          body.ct_bufferfly(x0++, x1++, w, wshoup);
+        ++w;
+        ++wshoup;
+      }
     }
   }
 }
-
 
 void negacylic_backward_lazy(
   params::value_type *x, 
@@ -241,23 +306,37 @@ void negacylic_backward_lazy(
   const params::value_type *wtab_shoup,
   const params::value_type p)
 {
-  size_t t = 1;
   ntt_loop_body body(p);
+  size_t t = 1;
   for (size_t m = degree; m > 1; m >>= 1u) {
     const size_t h = m >> 1u;
     size_t j1 = 0;
     const params::value_type *w = &wtab[h];
     const params::value_type *wshoup = &wtab_shoup[h];
-    for (size_t i = 0; i < h; ++i) {
-      const size_t j2 = j1 + t;
-      auto x0 = &x[j1];
-      auto x1 = &x[j1 + t];
-      for (size_t j = j1; j < j2; ++j)
-        body.gs_bufferfly(x0++, x1++, w, wshoup);
-
-      j1 = j1 + (t << 1u);
-      ++w;
-      ++wshoup;
+    if (t >= 4) {
+      for (size_t i = 0; i != h; ++i) {
+        const size_t j2 = j1 + t;
+        auto x0 = &x[j1];
+        auto x1 = &x[j2];
+        //! Unroll a little bit to reduce the number of branches.
+        body.four_gs_butterfly(j1, j2, x0, x1, w, wshoup);
+        x0 += 4u;
+        x1 += 4u;
+        ++w;
+        ++wshoup;
+        j1 = j1 + (t << 1u);
+      }
+    } else { //! last two layers
+      for (size_t i = 0; i != h; ++i) {
+        const size_t j2 = j1 + t;
+        auto x0 = &x[j1];
+        auto x1 = &x[j2];
+        for (size_t j = j1; j != j2; ++j)
+          body.gs_bufferfly(x0++, x1++, w, wshoup);
+        ++w;
+        ++wshoup;
+        j1 = j1 + (t << 1u);
+      }
     }
     t <<= 1u;
   }

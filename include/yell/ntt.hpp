@@ -27,7 +27,11 @@ private:
     ~ntt_precomputed() {}
 
     void init(size_t cm);
-    // precomputed tables
+    //! precomputed tables
+    //! phi^(2 * degree) = 1 \bmod prime[cm]
+    //! invphi = phi^(-1) \bmod prime[cm]
+    //! shoupXX are Shoup's trick to accelerate the multiplication reduction.
+    //! Values in these tables are stored in the bit-reverse order.
     T phis[degree],
       shoupphis[degree],
       invphis[degree],
