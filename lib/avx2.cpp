@@ -24,3 +24,15 @@ __m256i avx_mm256_mul64_hi(__m256i const& A, __m256i const& B)
   return _mm256_add_epi64(carry, _mm256_add_epi64(AhiBhi, _mm256_add_epi64(AhiBlo_hi, AloBhi_hi)));
 }
 
+__m256i avx_mm256_mul64_lo(__m256i const& A, __m256i const& B)
+{
+  //! A := A_hi * 2^32 + A_lo;
+  //! B := B_hi * 2^32 + B_lo; 
+  //! Compute (A * B) bmod 2^64
+  __m256i Ahi = _mm256_shuffle_epi32(A, 1 | (0 << 2) | (3 << 4) | (2 << 6));
+  __m256i Bhi = _mm256_shuffle_epi32(B, 1 | (0 << 2) | (3 << 4) | (2 << 6));
+  __m256i AloBlo = _mm256_mul_epu32(A, B);
+  __m256i AhiBlo = _mm256_slli_epi64(_mm256_mul_epu32(Ahi, B), 32);
+  __m256i AloBhi = _mm256_slli_epi64(_mm256_mul_epu32(A, Bhi), 32);
+  return _mm256_add_epi64(AloBlo, _mm256_add_epi64(AhiBlo, AloBhi));
+}
