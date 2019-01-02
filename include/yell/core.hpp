@@ -10,7 +10,7 @@
 #include "yell/gmp.hpp"
 #include "yell/utils/math.hpp"
 
-#ifdef USE_MEM_POOL
+#ifdef YELL_USE_MEM_POOL
 #include <boost/pool/pool.hpp>
 template<size_t degree, size_t nmoduli>
 boost::pool<> yell::poly<degree, nmoduli>::_mem_pool(degree * sizeof(value_type));

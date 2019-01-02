@@ -8,7 +8,7 @@
 #include "yell/params.hpp"
 #include "yell/prng/fastrandombytes.h"
 #include "yell/prng/FastGaussianNoise.hpp"
-#ifdef USE_MEM_POOL
+#ifdef YELL_USE_MEM_POOL
 #include <boost/pool/poolfwd.hpp>
 #endif
 
@@ -43,8 +43,6 @@ class poly {
   static_assert(degree_ < yell::params::kMaxPolyDegree, "");
   static_assert(nmoduli_ < yell::params::kMaxNbModuli, "");
   std::array<params::value_type *, nmoduli_> _data;
-  params::value_type** raw_data() { return _data.data(); }
-  params::value_type* const* raw_data() const { return _data.data(); }
 #ifdef USE_MEM_POOL
   static boost::pool<> _mem_pool; // memory pool.
 #endif
@@ -114,38 +112,16 @@ public:
   void backward();
   /* misc
    */
-
   value_type get_modulus(size_t cm) { assert(cm < nmoduli); return params::P[cm]; }
+
+  params::value_type** raw_data() { return _data.data(); }
+
+  params::value_type* const* raw_data() const { return _data.data(); }
 
   void clear();
 
   constexpr size_t size() const { return sizeof(_data); }
-  /* Recasting
-   */
-  template <size_t HEAD> 
-  poly<degree, HEAD>* take_head_moduli() {
-    static_assert(HEAD <= nmoduli, "");
-    return reinterpret_cast<poly<degree, HEAD> *>(raw_data());
-  }
-
-  template <size_t HEAD> 
-  const poly<degree, HEAD>* take_head_moduli() const {
-    static_assert(HEAD <= nmoduli, "");
-    return reinterpret_cast<poly<degree, HEAD> *>(raw_data());
-  }
-
-  template <size_t TAIL> 
-  poly<degree, TAIL>* take_tail_moduli() {
-    static_assert(TAIL <= nmoduli, "");
-    return reinterpret_cast<poly<degree, TAIL> *>(raw_data() + (nmoduli - TAIL));
-  }
-
-  template <size_t TAIL> 
-  const poly<degree, TAIL>* take_tail_moduli() const {
-    static_assert(TAIL <= nmoduli, "");
-    return reinterpret_cast<poly<degree, TAIL> *>(raw_data() + (nmoduli - TAIL));
-  }
-
+  
   void check_vaild_range() const;
   /* GMP
    * The caller should clean up the mpz_t array.
@@ -164,6 +140,31 @@ struct ArrayPointer {
   using T = std::array<value_type, degree> *;
   using cT = const T;
 };
+
+/* Recasting */
+template <size_t HEAD, size_t degree, size_t N> 
+poly<degree, HEAD>* take_head_moduli(poly<degree, N> &op) {
+  static_assert(HEAD <= N, "");
+  return reinterpret_cast<poly<degree, HEAD> *>(op.raw_data());
+}
+
+template <size_t HEAD, size_t degree, size_t N> 
+const poly<degree, HEAD>* take_head_moduli(poly<degree, N> const& op) {
+  static_assert(HEAD <= N, "");
+  return reinterpret_cast<poly<degree, HEAD> *>(op.raw_data());
+}
+
+template <size_t TAIL, size_t degree, size_t N> 
+poly<degree, TAIL>* take_tail_moduli(poly<degree, N> &op) {
+  static_assert(TAIL <= N, "");
+  return reinterpret_cast<poly<degree, TAIL> *>(op.raw_data() + (N - TAIL));
+}
+
+template <size_t TAIL, size_t degree, size_t N> 
+const poly<degree, TAIL>* take_tail_moduli(poly<degree, N> const& op) {
+  static_assert(TAIL <= N, "");
+  return reinterpret_cast<poly<degree, TAIL> *>(op.raw_data() + (N - TAIL));
+}
 
 /* recast the specific moduli as an array. */
 template <size_t degree, size_t nmoduli> typename ArrayPointer<yell::params::value_type, degree>::T
