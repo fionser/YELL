@@ -151,7 +151,7 @@ poly<degree, HEAD>* take_head_moduli(poly<degree, N> &op) {
 template <size_t HEAD, size_t degree, size_t N> 
 const poly<degree, HEAD>* take_head_moduli(poly<degree, N> const& op) {
   static_assert(HEAD <= N, "");
-  return reinterpret_cast<poly<degree, HEAD> *>(op.raw_data());
+  return reinterpret_cast<const poly<degree, HEAD> *>(op.raw_data());
 }
 
 template <size_t TAIL, size_t degree, size_t N> 
@@ -163,7 +163,7 @@ poly<degree, TAIL>* take_tail_moduli(poly<degree, N> &op) {
 template <size_t TAIL, size_t degree, size_t N> 
 const poly<degree, TAIL>* take_tail_moduli(poly<degree, N> const& op) {
   static_assert(TAIL <= N, "");
-  return reinterpret_cast<poly<degree, TAIL> *>(op.raw_data() + (N - TAIL));
+  return reinterpret_cast<const poly<degree, TAIL> *>(op.raw_data() + (N - TAIL));
 }
 
 /* recast the specific moduli as an array. */
