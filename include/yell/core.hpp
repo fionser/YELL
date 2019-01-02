@@ -1,6 +1,4 @@
 #pragma once
-
-#include <vector>
 #include <numeric>
 #include <cassert>
 #include <iostream>
@@ -8,12 +6,13 @@
 #include <type_traits>
 #include <cmath>
 #include "yell/gmp.hpp"
+#include "yell/ntt.hpp"
 #include "yell/utils/math.hpp"
 
 #ifdef YELL_USE_MEM_POOL
 #include <boost/pool/pool.hpp>
-template<size_t degree, size_t nmoduli>
-boost::pool<> yell::poly<degree, nmoduli>::_mem_pool(degree * sizeof(value_type));
+template<size_t degree>
+boost::pool<> yell::poly<degree>::_mem_pool(degree * sizeof(value_type));
 #define ALLOC_MEM(bytes) _mem_pool.malloc()
 #define RELEASE_MEM(ptr) _mem_pool.free(ptr)
 #else
@@ -28,17 +27,19 @@ namespace yell {
 //    Constructor
 // *********************************************************
 
-template<size_t degree, size_t nmoduli>
-poly<degree, nmoduli>::poly() {
+template<size_t degree>
+poly<degree>::poly(size_t nmoduli) : nmoduli(nmoduli) {
+  assert(nmoduli > 0 && nmoduli <= params::kMaxNbModuli);
   constexpr size_t bytes = degree * sizeof(value_type);
+  _data.resize(nmoduli, nullptr);
   for (size_t cm = 0; cm < nmoduli; ++cm) {
     _data[cm] = (value_type *) ALLOC_MEM(bytes);
     std::memset(_data[cm], 0, bytes);
   }
 }
 
-template<size_t degree, size_t nmoduli>
-poly<degree, nmoduli>::poly(poly const& oth) {
+template<size_t degree>
+poly<degree>::poly(poly const& oth) : poly(oth.nmoduli) {
   constexpr size_t bytes = degree * sizeof(value_type);
   for (size_t cm = 0; cm < nmoduli; ++cm) {
     assert(oth._data[cm]); 
@@ -47,45 +48,35 @@ poly<degree, nmoduli>::poly(poly const& oth) {
   }
 }
 
-template<size_t degree, size_t nmoduli>
-poly<degree, nmoduli>::poly(poly && oth) : _data(oth._data) {
-  for (auto& ptr : oth._data)
-    ptr = nullptr;
-}
-
-template<size_t degree, size_t nmoduli> poly<degree, nmoduli>& 
-poly<degree, nmoduli>::operator=(poly const& oth) 
+template<size_t degree> poly<degree>& 
+poly<degree>::operator=(poly const& oth)
 {
-  constexpr size_t bytes = degree * sizeof(value_type);
-  for (size_t cm = 0; cm < nmoduli; ++cm) {
-    if (!_data.at(cm))
-      _data[cm] = (value_type *) ALLOC_MEM(bytes);
-    std::memcpy(_data[cm], oth.cptr_at(cm), bytes);
-  }
+  poly<degree> tmp(oth);
+  std::swap(tmp._data, _data);
+  nmoduli = oth.nmoduli;
   return *this;
 }
 
-template<size_t degree, size_t nmoduli>
-poly<degree, nmoduli>::~poly() {
+template<size_t degree>
+poly<degree>::poly(poly && oth) : nmoduli(oth.nmoduli), _data(oth._data) {
+  oth.clear();
+}
+
+template<size_t degree>
+poly<degree>::~poly() {
   for (auto& ptr : _data) {
     RELEASE_MEM(ptr);
     ptr = nullptr;
   }
 }
 
-template<size_t degree, size_t nmoduli>
-poly<degree, nmoduli>::poly(value_type v) : poly<degree, nmoduli>() {
-  if (v == 0) 
-    return ; // already init as 0.
-  for (size_t cm = 0; cm < nmoduli; ++cm) 
-    std::fill(ptr_at(cm), ptr_end(cm), v);
-}
-
 // ****************************************************
 // operators
 // ****************************************************
-template<size_t degree_, size_t nmoduli_>
-bool poly<degree_, nmoduli_>::operator==(poly<degree_, nmoduli_> const& oth) const{
+template<size_t degree_>
+bool poly<degree_>::operator==(poly<degree_> const& oth) const{
+  if (nmoduli != oth.nmoduli)
+    return false;
   constexpr size_t bytes = degree_ * sizeof(value_type);
   for (size_t cm = 0; cm < nmoduli; ++cm) {
     if (std::memcmp(cptr_at(cm), oth.cptr_at(cm), bytes) != 0)
@@ -94,18 +85,19 @@ bool poly<degree_, nmoduli_>::operator==(poly<degree_, nmoduli_> const& oth) con
   return true;
 }
 
-template<size_t degree_, size_t nmoduli_>
-void poly<degree_, nmoduli_>::clear() {
+template<size_t degree_>
+void poly<degree_>::clear() {
   for (size_t cm = 0; cm < nmoduli; ++cm) 
     std::fill(ptr_at(cm), ptr_end(cm), 0);
 }
 
-template<size_t degree_, size_t nmoduli_> poly<degree_, nmoduli_>& 
-poly<degree_, nmoduli_>::add_product_of(const poly<degree_, nmoduli_>& op0, 
-                                        const poly<degree_, nmoduli_>& op1)
+template<size_t degree_> 
+poly<degree_>& poly<degree_>::add_product_of(const poly<degree_>& op0, 
+                                             const poly<degree_>& op1)
 {
+  assert(nmoduli == op0.nmoduli && nmoduli == op1.nmoduli);
   ops::muladd muladd;
-  for (size_t cm = 0; cm < nmoduli_; ++cm) {
+  for (size_t cm = 0; cm < nmoduli; ++cm) {
     auto dst  = ptr_at(cm);
     auto op0_ = op0.cptr_at(cm);
     auto op1_ = op1.cptr_at(cm);
@@ -115,40 +107,39 @@ poly<degree_, nmoduli_>::add_product_of(const poly<degree_, nmoduli_>& op0,
   return *this;
 }
 
-template <size_t degree_, size_t nmoduli_>
-void poly<degree_, nmoduli_>::negate() {
-  for (size_t cm = 0; cm < nmoduli_; ++cm) {
+template <size_t degree_>
+void poly<degree_>::negate() {
+  for (size_t cm = 0; cm < nmoduli; ++cm) {
     auto P = get_modulus(cm);
-    std::transform(cptr_at(cm), cptr_end(cm), ptr_at(cm),
-                   [P](value_type v) { return P - v; });
+    std::transform(cptr_at(cm), cptr_end(cm), ptr_at(cm), [P](value_type v) { return P - v; });
   }
 }
 
 // ********************
 // GMP
 // ********************
-template<size_t degree_, size_t nmoduli_>
-std::array<mpz_t, degree_> poly<degree_, nmoduli_>::poly2mpz() const {
-  return gmp::poly2mpz<degree_, nmoduli_>(*this);
+template<size_t degree_>
+std::array<mpz_t, degree_> poly<degree_>::poly2mpz() const {
+  return gmp::poly2mpz<degree_>(*this);
 }
 
 // ****************************************************
 // NTT related 
 // ****************************************************
-template<size_t degree, size_t nmoduli>
-void poly<degree, nmoduli>::forward() {
+template<size_t degree>
+void poly<degree>::forward() {
   for (size_t cm = 0; cm < nmoduli; ++cm)
     ntt<degree>::forward(ptr_at(cm), cm);
 }
 
-template<size_t degree, size_t nmoduli>
-void poly<degree, nmoduli>::forward_lazy() {
+template<size_t degree>
+void poly<degree>::forward_lazy() {
   for (size_t cm = 0; cm < nmoduli; ++cm) 
     ntt<degree>::forward_lazy(ptr_at(cm), cm);
 }
  
-template<size_t degree, size_t nmoduli>
-void poly<degree, nmoduli>::backward() {
+template<size_t degree>
+void poly<degree>::backward() {
   for (size_t cm = 0; cm < nmoduli; ++cm)
     ntt<degree>::backward(ptr_at(cm), cm);
 }
@@ -160,13 +151,13 @@ void poly<degree, nmoduli>::backward() {
 // Sets a pre-allocated random polynomial in FFT form
 // uniformly random, else the coefficients are uniform below the bound
 
-template<size_t degree, size_t nmoduli>
-poly<degree, nmoduli>::poly(uniform const& u) : poly<degree, nmoduli>() {
+template<size_t degree>
+poly<degree>::poly(size_t nmoduli, uniform const& u) : poly<degree>(nmoduli) {
   set(u);
 }
 
-template<size_t degree, size_t nmoduli>
-void poly<degree, nmoduli>::set(uniform const &) {
+template<size_t degree>
+void poly<degree>::set(uniform const &) {
   // In uniform mode we need randomness for all the polynomials in the CRT
   for (size_t cm = 0; cm < nmoduli; ++cm)
     fastrandombytes((unsigned char *) ptr_at(cm), degree * sizeof(value_type));
@@ -195,15 +186,15 @@ void poly<degree, nmoduli>::set(uniform const &) {
   check_vaild_range();
 }
 
-template<size_t degree, size_t nmoduli>
+template<size_t degree>
 template<class in_class, unsigned _lu_depth>
-poly<degree, nmoduli>::poly(gaussian<in_class, _lu_depth> const& mode) : poly<degree, nmoduli>() {
+poly<degree>::poly(size_t nmoduli, gaussian<in_class, _lu_depth> const& mode) : poly<degree>(nmoduli) {
   set(mode);
 }
 
-template<size_t degree, size_t nmoduli>
+template<size_t degree>
 template<class in_class, unsigned _lu_depth>
-void poly<degree, nmoduli>::set(gaussian<in_class, _lu_depth> const& mode) {
+void poly<degree>::set(gaussian<in_class, _lu_depth> const& mode) {
   uint64_t const amplifier = mode.amplifier;
 
   // We play with the rnd pointer (in the uniform case), and thus
@@ -227,13 +218,13 @@ void poly<degree, nmoduli>::set(gaussian<in_class, _lu_depth> const& mode) {
   check_vaild_range();
 }
 
-template<size_t degree, size_t nmoduli>
-poly<degree, nmoduli>::poly(ZO_dist const& mode) : poly<degree, nmoduli>() {
+template<size_t degree>
+poly<degree>::poly(size_t nmoduli, ZO_dist const& mode) : poly<degree>(nmoduli) {
   set(mode);
 }
 
-template<size_t degree, size_t nmoduli>
-void poly<degree, nmoduli>::set(ZO_dist const& mode) {
+template<size_t degree>
+void poly<degree>::set(ZO_dist const& mode) {
   uint8_t rnd[degree];
   fastrandombytes(rnd, sizeof(rnd));
   for (size_t cm = 0; cm < nmoduli; ++cm) {
@@ -247,13 +238,13 @@ void poly<degree, nmoduli>::set(ZO_dist const& mode) {
   check_vaild_range();
 }
 
-template<size_t degree, size_t nmoduli>
-poly<degree, nmoduli>::poly(hwt_dist const& mode) : poly<degree, nmoduli>() {
+template<size_t degree>
+poly<degree>::poly(size_t nmoduli, hwt_dist const& mode) : poly<degree>(nmoduli) {
   set(mode);
 }
 
-template<size_t degree, size_t nmoduli>
-void poly<degree, nmoduli>::set(hwt_dist const& mode) {
+template<size_t degree>
+void poly<degree>::set(hwt_dist const& mode) {
   assert(mode.hwt > 0 && mode.hwt <= degree);
   std::vector<size_t> hitted(mode.hwt);
   std::iota(hitted.begin(), hitted.end(), 0U); // select the first hwt positions.
@@ -301,27 +292,27 @@ void poly<degree, nmoduli>::set(hwt_dist const& mode) {
 // Helper functions
 // *********************************************************
 
-template<size_t degree, size_t nmoduli>
-std::ostream& operator<<(std::ostream& outs, poly<degree, nmoduli> const& p)
+template<size_t degree>
+std::ostream& operator<<(std::ostream& outs, poly<degree> const& p)
 {
   std::string term = "ULL";
   outs << "{";
-  for (size_t cm = 0; cm < nmoduli; ++cm) {
+  for (size_t cm = 0; cm < p.nmoduli; ++cm) {
     auto ptr = p.cptr_at(cm);
     outs << "{";
     for (size_t i = 0; i + 1 < degree; ++i) {
       outs << *ptr++ << term << ", ";
     }
     outs << *ptr++ << term << "}";
-    if (cm + 1 < nmoduli)
+    if (cm + 1 < p.nmoduli)
       outs << "\n";
   }
   outs << "}";
   return outs;
 }
 
-template<size_t degree, size_t nmoduli>
-void poly<degree, nmoduli>::check_vaild_range() const {
+template<size_t degree>
+void poly<degree>::check_vaild_range() const {
 #ifndef NDEBUG
   for (size_t cm = 0; cm < nmoduli; ++cm) {
     auto ptr = cptr_at(cm);

@@ -1,14 +1,15 @@
 #pragma once
 #include "yell/utils/safe_ptr.h"
+#include "yell/params.hpp"
 #include <gmp.h>
 #include <array>
 #include <unordered_map>
 
 namespace yell {
-template <size_t degree, size_t nmoduli> class poly; // forward declaration
+template <size_t degree> class poly; // forward declaration
 class gmp {
 private:
-  using T = typename params::value_type;
+  using T = params::value_type;
 
   gmp() {}
   gmp(gmp const& oth) = delete;
@@ -37,8 +38,8 @@ private:
 public:
   static const gmp_precomputed* init_table(size_t nmoduli);
 
-  template <size_t degree_, size_t nmoduli_>
-  static std::array<mpz_t, degree_> poly2mpz(poly<degree_, nmoduli_> const& op);
+  template <size_t degree_>
+  static std::array<mpz_t, degree_> poly2mpz(poly<degree_> const& op);
 }; 
 } // namespace yell
 

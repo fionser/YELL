@@ -3,24 +3,31 @@
 #include <type_traits>
 namespace yell {
 #define YELL_BINARY_OPERATOR(Op, Name) \
-template<size_t degree, size_t nmoduli> \
-poly<degree, nmoduli> Op(poly<degree, nmoduli> const& op0, \
-                         poly<degree, nmoduli> const& op1) {\
+template<size_t degree> \
+poly<degree> Op(poly<degree> const& op0, \
+                poly<degree> const& op1) {\
+  assert(op0.moduli_count() == op1.moduli_count()); \
+  size_t nmoduli = std::min(op0.moduli_count(), \
+                            op1.moduli_count()); \
   ops::Name op; \
-  poly<degree, nmoduli> rop{op0}; \
+  poly<degree> rop(nmoduli); \
   for (size_t cm = 0; cm < nmoduli; ++cm) { \
     auto dst = rop.ptr_at(cm); \
+    auto op0_ptr = op0.cptr_at(cm); \
     auto op1_ptr = op1.cptr_at(cm); \
     for (size_t i = 0; i < degree; ++i) \
-      op.compute(*dst++, *op1_ptr++, cm);\
+      *dst++ = op(*op0_ptr++, *op1_ptr++, cm);\
   } \
   return rop; \
 }
 
 #define YELL_SELF_BINARY_OPERATOR(Op, Name) \
-template<size_t degree, size_t nmoduli> \
-poly<degree, nmoduli>& Op(poly<degree, nmoduli> &op0, \
-                          poly<degree, nmoduli> const& op1) {\
+template<size_t degree> \
+poly<degree>& Op(poly<degree> &op0, \
+                 poly<degree> const& op1) {\
+  assert(op0.moduli_count() == op1.moduli_count()); \
+  size_t nmoduli = std::min(op0.moduli_count(), \
+                            op1.moduli_count()); \
   ops::Name op; \
   for (size_t cm = 0; cm < nmoduli; ++cm) { \
     auto dst = op0.ptr_at(cm); \

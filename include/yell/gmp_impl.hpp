@@ -84,10 +84,11 @@ const gmp::gmp_precomputed* gmp::init_table(size_t nmoduli)
   return tbl;
 }
 
-template <size_t degree_, size_t nmoduli_>
-std::array<mpz_t, degree_> gmp::poly2mpz(poly<degree_, nmoduli_> const& op)
+template <size_t degree_>
+std::array<mpz_t, degree_> gmp::poly2mpz(poly<degree_> const& op)
 {
-  auto tbl = init_table(nmoduli_);
+  const size_t nmoduli_ = op.nmoduli;
+  auto tbl = init_table(op.nmoduli_);
   std::array<mpz_t, degree_> rop;
   for (size_t i = 0; i < degree_; ++i)
     mpz_init2(rop[i], tbl->shift_modulus_shoup - 1);
