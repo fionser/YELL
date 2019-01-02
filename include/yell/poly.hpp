@@ -43,7 +43,7 @@ class poly {
   static_assert(degree_ < yell::params::kMaxPolyDegree, "");
   static_assert(nmoduli_ < yell::params::kMaxNbModuli, "");
   std::array<params::value_type *, nmoduli_> _data;
-#ifdef USE_MEM_POOL
+#ifdef YELL_USE_MEM_POOL
   static boost::pool<> _mem_pool; // memory pool.
 #endif
 
