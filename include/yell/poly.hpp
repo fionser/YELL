@@ -159,4 +159,4 @@ YELL_SELF_BINARY_OPERATOR(operator+=, addmod);
 YELL_SELF_BINARY_OPERATOR(operator-=, submod);
 
 } // namespace yell
-#include "yell/core.hpp"
+#include "yell/details/poly.hpp"

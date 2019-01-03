@@ -10,30 +10,32 @@ namespace global {
 
 struct SK {
 
-  explicit SK() : sx(yell::hwt_dist(64)) {
+  explicit SK() : sx(NdM, yell::hwt_dist(64)) {
     sx.forward();
   }
 
-  yell::poly<Deg, NdM> sx;
+  yell::poly<Deg> sx;
 };
 
 struct PK {
-  
-  explicit PK(SK &sk) : ax(yell::uniform{}) {
+
+  explicit PK(SK &sk) : bx(NdM), ax(NdM, yell::uniform{}) {
     bx.set(global::gauss_struct(&global::fg_prng));
     bx.forward();
     bx.add_product_of(ax, sk.sx);
     bx.negate();
   }
 
-  yell::poly<Deg, NdM> bx, ax;
+  yell::poly<Deg> bx, ax;
 };
 
 struct CTXT {
-  yell::poly<Deg, NdM> bx, ax;
+  yell::poly<Deg> bx, ax;
 
-  explicit CTXT(yell::poly<Deg, NdM> const& msg, PK const& pk) {
-    yell::poly<Deg, NdM> u(yell::ZO_dist{});
+  explicit CTXT(yell::poly<Deg> const& msg, PK const& pk)
+    :bx(NdM), ax(NdM)
+  {
+    yell::poly<Deg> u(NdM, yell::ZO_dist{});
     u.forward();
     bx.set(global::gauss_struct(&global::fg_prng));
     bx += msg;
@@ -46,7 +48,7 @@ struct CTXT {
   }
 };
 
-void decrypt(yell::poly<Deg, NdM> *rop, CTXT const& ctx, SK const& sk)
+void decrypt(yell::poly<Deg> *rop, CTXT const& ctx, SK const& sk)
 {
   if (!rop) return;
   (*rop) = ctx.bx;
@@ -57,10 +59,11 @@ void decrypt(yell::poly<Deg, NdM> *rop, CTXT const& ctx, SK const& sk)
 int main() {
   SK sk;
   PK pk(sk);
-  yell::poly<Deg, NdM> msg(yell::uniform{});
+  yell::poly<Deg> msg(NdM, yell::uniform{});
 
   CTXT ctx(msg, pk);
-  yell::poly<Deg, NdM> plain;
+  yell::poly<Deg> plain(NdM);
+  auto coeffs = plain.poly2mpz();
 
   decrypt(&plain, ctx, sk);
 

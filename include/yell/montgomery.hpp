@@ -40,4 +40,4 @@ public:
 };
 } // namespace yell
 
-#include "yell/montgomery_impl.hpp"
+#include "yell/details/montgomery.hpp"

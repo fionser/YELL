@@ -3,7 +3,6 @@
 #include "yell/utils/safe_ptr.h"
 #include <unordered_map>
 namespace yell {
-
 template <size_t degree_>
 class ntt {
 private:
@@ -66,4 +65,4 @@ public:
 };
 } // namespace yell
 
-#include "yell/ntt_impl.hpp"
+#include "yell/details/ntt.hpp"
