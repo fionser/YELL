@@ -29,6 +29,8 @@ namespace yell {
 
 template<size_t degree>
 poly<degree>::poly(size_t nmoduli) : nmoduli(nmoduli) {
+  if (nmoduli == 0)
+    return;
   assert(nmoduli > 0 && nmoduli <= params::kMaxNbModuli);
   constexpr size_t bytes = degree * sizeof(value_type);
   _data.resize(nmoduli, nullptr);
@@ -58,8 +60,10 @@ poly<degree>::operator=(poly const& oth)
 }
 
 template<size_t degree>
-poly<degree>::poly(poly && oth) : nmoduli(oth.nmoduli), _data(oth._data) {
-  oth.clear();
+poly<degree>::poly(poly && oth) : poly(0) {
+  swap(*this, oth);
+  // nmoduli(oth.nmoduli), _data(oth._data) {
+  // oth.clear();
 }
 
 template<size_t degree>
