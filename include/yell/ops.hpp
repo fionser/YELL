@@ -94,29 +94,9 @@ struct submod {
       (4 * X + (X * pm) >> 64) >> 64
    -> (4*X + ((X >> 64) * pm)) >> 64;
 */
-void barret_reduction(params::gt_value_type *x, size_t cm)
-{
-  // NOTE: x should less than 2^{126}.
-  assert(x);
-  using T = typename params::value_type;
-  using gt_value_type = typename params::gt_value_type;
-  const T p = params::P[cm];
-  const T pm = params::Pn[cm];
-  constexpr size_t shift = params::kModulusRepresentationBitsize;
-  constexpr size_t delta = shift - params::kModulusBitsize;
-  gt_value_type q = ((gt_value_type) pm * ((*x) >> shift)) + ((*x) << delta) ;
+void barret_reduction(params::gt_value_type *x, size_t cm);
 
-  T r = (*x) - (q >> shift) * p;
-  mod_correct(r, p);
-  *x = (gt_value_type) r;
-}
-
-typename yell::params::value_type 
-shoupify(typename yell::params::value_type x, size_t cm)
-{
-  using gt = typename params::gt_value_type;
-  return ((gt) x << params::kModulusRepresentationBitsize) / params::P[cm];
-}
+yell::params::value_type shoupify(yell::params::value_type x, size_t cm);
 
 struct mulmod {
   using T = typename params::value_type;
