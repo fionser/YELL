@@ -29,9 +29,9 @@ namespace yell {
 
 template<size_t degree>
 poly<degree>::poly(size_t nmoduli) : nmoduli(nmoduli) {
+  assert(nmoduli <= params::kMaxNbModuli);
   if (nmoduli == 0)
     return;
-  assert(nmoduli > 0 && nmoduli <= params::kMaxNbModuli);
   constexpr size_t bytes = degree * sizeof(value_type);
   _data.resize(nmoduli, nullptr);
   for (size_t cm = 0; cm < nmoduli; ++cm) {
