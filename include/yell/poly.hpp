@@ -118,6 +118,11 @@ public:
 
   params::value_type* const* raw_data() const { return _data.data(); }
 
+  friend void swap(poly &a, poly &b) {
+    std::swap(a._data, b._data);
+    std::swap(a.nmoduli, b.nmoduli);
+  }
+
   void clear();
 
   size_t moduli_count() const { return nmoduli; }
