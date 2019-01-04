@@ -90,6 +90,8 @@ public:
   // *this += op0 * op1. Use lazy reduction for a better performance.
   poly<degree_>& add_product_of(const poly<degree_>& op0, const poly<degree_>& op1);
   void negate();
+  // Resize the number of moduli. add / drop extra moduli.
+  void resize_moduli_count(size_t nmoduli);
   
   /* polynomial indexing
    */
@@ -141,13 +143,13 @@ struct ArrayPointer {
 /* recast the specific moduli as an array. */
 template <size_t degree> typename ArrayPointer<yell::params::value_type, degree>::T
 recast_as_array(yell::poly<degree> &op, size_t cm) {
-  assert(cm < op.nmoduli);
+  assert(cm < op.moduli_count());
   return reinterpret_cast<typename ArrayPointer<yell::params::value_type, degree>::T>(op.ptr_at(cm));
 }
 
 template <size_t degree> typename ArrayPointer<yell::params::value_type, degree>::cT
 recast_as_array(yell::poly<degree> const& op, size_t cm) {
-  assert(cm < op.nmoduli);
+  assert(cm < op.moduli_count());
   return reinterpret_cast<typename ArrayPointer<yell::params::value_type, degree>::cT>(op.cptr_at(cm));
 }
 

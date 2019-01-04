@@ -51,9 +51,9 @@ poly<degree>::poly(poly const& oth) : poly(oth.nmoduli) {
 template<size_t degree> poly<degree>& 
 poly<degree>::operator=(poly const& oth)
 {
-  poly<degree> tmp(oth);
-  std::swap(tmp._data, _data);
-  nmoduli = oth.nmoduli;
+  resize_moduli_count(oth.moduli_count());
+  for (size_t cm = 0; cm < nmoduli; ++cm)
+    std::memcpy(ptr_at(cm), oth.cptr_at(cm), sizeof(value_type) * degree);
   return *this;
 }
 
@@ -83,6 +83,28 @@ bool poly<degree_>::operator==(poly<degree_> const& oth) const{
       return false;
   }
   return true;
+}
+
+template<size_t degree_>
+void poly<degree_>::resize_moduli_count(size_t new_nmoduli) {
+  assert(new_nmoduli <= params::kMaxNbModuli);
+  if (nmoduli == new_nmoduli)
+    return;
+  constexpr size_t bytes = sizeof(value_type) * degree_;
+  if (new_nmoduli > nmoduli) {
+    for (size_t i = nmoduli; i < new_nmoduli; ++i) {
+      auto new_chunk = (value_type *) ALLOC_MEM(bytes);
+      if (!new_chunk)
+        throw std::runtime_error("Memory allocation failed.");
+      _data.push_back(new_chunk);
+    }
+  } else {
+    for (size_t i = new_nmoduli; i < nmoduli; ++i)
+      RELEASE_MEM(_data[i]);
+    _data.erase(_data.begin() + new_nmoduli);
+  }
+  nmoduli = new_nmoduli;
+  assert(_data.size() == new_nmoduli);
 }
 
 template<size_t degree_>
@@ -295,16 +317,17 @@ void poly<degree>::set(hwt_dist const& mode) {
 template<size_t degree>
 std::ostream& operator<<(std::ostream& outs, poly<degree> const& p)
 {
-  std::string term = "ULL";
+  const size_t nmoduli = p.moduli_count();
+  const std::string term = "ULL";
   outs << "{";
-  for (size_t cm = 0; cm < p.nmoduli; ++cm) {
+  for (size_t cm = 0; cm < nmoduli; ++cm) {
     auto ptr = p.cptr_at(cm);
     outs << "{";
     for (size_t i = 0; i + 1 < degree; ++i) {
       outs << *ptr++ << term << ", ";
     }
     outs << *ptr++ << term << "}";
-    if (cm + 1 < p.nmoduli)
+    if (cm + 1 < nmoduli)
       outs << "\n";
   }
   outs << "}";
