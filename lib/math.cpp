@@ -1,7 +1,7 @@
 #include <cassert>
 namespace yell { namespace math {
 
-uint32_t reverse_bits(uint32_t b)
+uint32_t reverse_bits(uint32_t v)
 {
   //! taken from bit twiddling hacks
   // swap odd and even bits
