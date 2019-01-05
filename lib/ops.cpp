@@ -1,5 +1,6 @@
 #include "yell/params.hpp"
 #include <cassert>
+#include <cstddef>
 namespace yell{ namespace ops {
 void barret_reduction(params::gt_value_type *x, size_t cm)
 {

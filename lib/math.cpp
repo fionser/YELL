@@ -1,4 +1,5 @@
 #include <cassert>
+#include <cstdint>
 namespace yell { namespace math {
 
 uint32_t reverse_bits(uint32_t v)
