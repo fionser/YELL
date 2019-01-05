@@ -1,13 +1,10 @@
 #include <cassert>
 namespace yell { namespace math {
 
-uint32_t reverse_bits(uint32_t operand)
+uint32_t reverse_bits(uint32_t b)
 {
-  operand = (((operand & 0xaaaaaaaa) >> 1) | ((operand & 0x55555555) << 1));
-  operand = (((operand & 0xcccccccc) >> 2) | ((operand & 0x33333333) << 2));
-  operand = (((operand & 0xf0f0f0f0) >> 4) | ((operand & 0x0f0f0f0f) << 4));
-  operand = (((operand & 0xff00ff00) >> 8) | ((operand & 0x00ff00ff) << 8));
-  return((operand >> 16) | (operand << 16));
+  //! from bit twiddling hacks
+  return ((b * 0x80200802ULL) & 0x0884422110ULL) * 0x0101010101ULL >> 32;
 }
 
 /* The operand is less than 32 */
