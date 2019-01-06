@@ -12,11 +12,10 @@ find_package(GMP REQUIRED)
 find_package(MPFR REQUIRED)
 include_directories(${GMP_INCLUDES} ${MPFR_INCLUDES})
 
-
-add_definitions(-DUSE_MEM_POOL)
-# flags for tcmalloc
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free")
+## optional flags
+#add_definitions(-DYELL_USE_MEM_POOL)
+#add_definitions(-DYELL_USE_32BITS_MODULI)
+#add_definitions(-DYELL_USE_AVX)
 include_directories(include/)
 
 file(GLOB YELL_ASMC lib/prng/*.s)
@@ -25,3 +24,6 @@ add_library(yell STATIC ${YELL_SRC} ${YELL_ASMC})
 
 add_executable(example example.cpp)
 target_link_libraries(example yell gmp mpfr)
+
+include_directories(${GMP_INCLUDES} ${MPFR_INCLUDES})
+

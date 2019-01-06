@@ -3,6 +3,7 @@
 #include <vector>
 #include <iosfwd>
 #include <iterator>
+#include "yell/defines.h"
 #include "yell/ops.hpp"
 #include "yell/meta.hpp"
 #include "yell/params.hpp"
@@ -28,14 +29,14 @@ struct ZO_dist { // zero distribution.
   explicit ZO_dist(uint8_t rho_ = 0x7F) : rho(rho_) {}
 };
 
-template<class in_class, unsigned _lu_depth>
+template<class in_class, class out_class, unsigned _lu_depth>
 struct gaussian {
-  FastGaussianNoise<in_class, _lu_depth> *fg_prng;
+  FastGaussianNoise<in_class, out_class, _lu_depth> *fg_prng;
   uint64_t amplifier;
-  explicit gaussian(FastGaussianNoise<in_class, _lu_depth> *prng) 
+  explicit gaussian(FastGaussianNoise<in_class, out_class, _lu_depth> *prng) 
     : fg_prng{prng}, amplifier{1} {}
 
-  gaussian(FastGaussianNoise<in_class, _lu_depth> *prng, uint64_t amp) 
+  gaussian(FastGaussianNoise<in_class, out_class, _lu_depth> *prng, uint64_t amp) 
     : fg_prng{prng}, amplifier{amp} {}
 };
 
@@ -52,8 +53,8 @@ public:
   using value_type = params::value_type;
   using gt_value_type = params::gt_value_type;
   using signed_type = params::signed_type;
-  using pointer_type = uint64_t *;
-  using const_pointer_type = uint64_t const*;
+  using pointer_type = value_type *;
+  using const_pointer_type = value_type const*;
   using iterator = pointer_type;
   using const_iterator = const_pointer_type;
   static constexpr size_t degree = degree_;
@@ -69,13 +70,13 @@ public:
   explicit poly(size_t nmoduli_, hwt_dist const& mode);
   explicit poly(size_t nmoduli_, ZO_dist const& mode);
   template <class in_class, unsigned _lu_depth> 
-  explicit poly(size_t nmoduli_, gaussian<in_class, _lu_depth> const& mode);
+  explicit poly(size_t nmoduli_, gaussian<in_class, value_type, _lu_depth> const& mode);
 
   void set(uniform const& mode);
   void set(hwt_dist const& mode);
   void set(ZO_dist const& mode);
   template <class in_class, unsigned _lu_depth> 
-  void set(gaussian<in_class, _lu_depth> const& mode);
+  void set(gaussian<in_class, value_type, _lu_depth> const& mode);
 
   /* iterators
    */

@@ -8,7 +8,7 @@ gmp::gmp_precomputed::gmp_precomputed(size_t nmoduli)
 {
   mpz_init_set_ui(moduli_product_, 1);
   for (size_t j = 0; j < nmoduli; j++) {
-    T p = yell::params::P[j];
+    T p = params::P[j];
     mpz_mul_ui(moduli_product_, moduli_product_, p);
   }
 
@@ -16,7 +16,7 @@ gmp::gmp_precomputed::gmp_precomputed(size_t nmoduli)
 
   // Compute Shoup value for optimized reduction modulo "moduli_product"
   shift_modulus_shoup = bits_in_moduli_product +
-                        yell::params::kModulusRepresentationBitsize +
+                        params::kModulusRepresentationBitsize +
                         (T) std::log2(nmoduli) + 1;
 
   mpz_init2(modulus_shoup, shift_modulus_shoup);
@@ -32,7 +32,7 @@ gmp::gmp_precomputed::gmp_precomputed(size_t nmoduli)
   lifting_integers = new mpz_t[nmoduli];
   for (size_t j = 0; j < nmoduli; j++) {
     // Current modulus
-    T p = yell::params::P[j];
+    T p = params::P[j];
     mpz_set_ui(current_modulus, p);
 
     // compute the product of primes except the current one

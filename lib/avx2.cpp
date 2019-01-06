@@ -1,4 +1,3 @@
-#ifdef YELL_USE_AVX2
 #include "yell/avx2.h"
 #include <immintrin.h>
 
@@ -75,4 +74,14 @@ __m256i avx_mm256_mul64_lo(__m256i const& A, __m256i const& Ahi, __m256i const& 
   __m256i AloBhi = _mm256_slli_epi64(_mm256_mul_epu32(A, Bhi), 32);
   return _mm256_add_epi64(AloBlo, _mm256_add_epi64(AhiBlo, AloBhi));
 }
-#endif // YELL_USE_AVX2
+
+__m256i avx_mm256_mul32_hi(__m256i A, __m256i B)
+{
+  const __m256i mullow = _mm256_srli_epi64(_mm256_mul_epu32(A, B), 32);
+  A = _mm256_shuffle_epi32(A, 1 | (0 << 2) | (3 << 4) | (2 << 6));
+  B = _mm256_shuffle_epi32(B, 1 | (0 << 2) | (3 << 4) | (2 << 6));
+  const __m256i mulhigh = _mm256_mul_epu32(A, B);
+  return reinterpret_cast<__m256i>(_mm256_blend_ps(reinterpret_cast<__m256>(mullow), 
+                                                   reinterpret_cast<__m256>(mulhigh), 0b10101010));
+}
+

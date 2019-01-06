@@ -37,9 +37,8 @@ struct output {
   std::list<in_class*> l_b_ptr;
 };
 
-template<class in_class, unsigned _lu_depth>
+template<class in_class, class out_class, unsigned _lu_depth>
 class FastGaussianNoise {
-  using out_class = uint64_t;
   typedef output<in_class, out_class> output_t;
 private:
   unsigned int _bit_precision;
@@ -161,8 +160,8 @@ double newton_raphson(double k, double max_guess, int digits)
 // Constructors
 
 
-template<class in_class, unsigned _lu_depth>
-FastGaussianNoise<in_class, _lu_depth>::FastGaussianNoise(
+template<class in_class, class out_class, unsigned _lu_depth>
+FastGaussianNoise<in_class, out_class, _lu_depth>::FastGaussianNoise(
   double sigma, 
   unsigned int security, 
   unsigned int samples, 
@@ -186,8 +185,8 @@ FastGaussianNoise<in_class, _lu_depth>::FastGaussianNoise(
   buildLookupTables();
 }
 
-template<class in_class, unsigned _lu_depth>
-FastGaussianNoise<in_class, _lu_depth>::FastGaussianNoise(double sigma, 
+template<class in_class, class out_class, unsigned _lu_depth>
+FastGaussianNoise<in_class, out_class, _lu_depth>::FastGaussianNoise(double sigma, 
                                                           unsigned int security, 
                                                           unsigned int samples, 
                                                           mpfr_t center /*=0*/, 
@@ -212,8 +211,8 @@ FastGaussianNoise<in_class, _lu_depth>::FastGaussianNoise(double sigma,
 
 
 // Check template parameters
-  template<class in_class, unsigned _lu_depth>
-void FastGaussianNoise<in_class,_lu_depth>::check_template_params() 
+  template<class in_class, class out_class, unsigned _lu_depth>
+void FastGaussianNoise<in_class, out_class,_lu_depth>::check_template_params() 
 {
   // Lookup tables can only have depth 1 or 2
   if (_lu_depth != 1 && _lu_depth != 2)
@@ -236,8 +235,8 @@ void FastGaussianNoise<in_class,_lu_depth>::check_template_params()
 
 
 // Compute some values (precision, number of barriers and outputs)
-  template<class in_class, unsigned _lu_depth>
-void FastGaussianNoise<in_class, _lu_depth>::init() 
+  template<class in_class, class out_class, unsigned _lu_depth>
+void FastGaussianNoise<in_class, out_class, _lu_depth>::init() 
 {
   double epsi, k;
 
@@ -299,8 +298,8 @@ void FastGaussianNoise<in_class, _lu_depth>::init()
 }
 
 
-  template<class in_class, unsigned _lu_depth>
-void FastGaussianNoise<in_class, _lu_depth>::precomputeBarrierValues() 
+  template<class in_class, class out_class, unsigned _lu_depth>
+void FastGaussianNoise<in_class, out_class, _lu_depth>::precomputeBarrierValues() 
 {
   // Declare and init mpfr vars
   mpfr_t sum, tmp, tmp2;
@@ -377,8 +376,8 @@ void FastGaussianNoise<in_class, _lu_depth>::precomputeBarrierValues()
 
 
 //Build lookup tables used during noise generation
-  template<class in_class, unsigned _lu_depth>
-void FastGaussianNoise<in_class,_lu_depth>::buildLookupTables() 
+  template<class in_class, class out_class, unsigned _lu_depth>
+void FastGaussianNoise<in_class, out_class,_lu_depth>::buildLookupTables() 
 {
   unsigned lu_index1 = 0, lu_index2 = 0;
   _flag_ctr1 = _flag_ctr2 = 0;
@@ -482,8 +481,8 @@ void FastGaussianNoise<in_class,_lu_depth>::buildLookupTables()
   if (_verbose) std::cout << "FastGaussianNoise: Lookup tables built" << std::endl;
 }
 
-  template<class in_class, unsigned _lu_depth>
-void FastGaussianNoise<in_class, _lu_depth>::getNoise(uint64_t * const rand_outdata, uint64_t rlen) 
+  template<class in_class, class out_class, unsigned _lu_depth>
+void FastGaussianNoise<in_class, out_class, _lu_depth>::getNoise(out_class* const rand_outdata, uint64_t rlen) 
 {
   uint64_t computed_outputs, innoise_bytesize, innoise_words, used_words;
   int64_t output;
@@ -604,8 +603,8 @@ void FastGaussianNoise<in_class, _lu_depth>::getNoise(uint64_t * const rand_outd
 
 /* Compare two arrays word by word.
  * return 1 if op1 > op2, 0 if equals and -1 if op1 < op2 */
-  template<class in_class, unsigned _lu_depth>
-inline int FastGaussianNoise<in_class, _lu_depth>::cmp(in_class *op1, in_class *op2) 
+  template<class in_class, class out_class, unsigned _lu_depth>
+inline int FastGaussianNoise<in_class, out_class, _lu_depth>::cmp(in_class *op1, in_class *op2) 
 {
 
   for (int i = 0; i < (int)_word_precision; i++) 
@@ -620,8 +619,8 @@ inline int FastGaussianNoise<in_class, _lu_depth>::cmp(in_class *op1, in_class *
 
 
 // Compute exp(-(x-center)^2/(2*sigma^2)) this is not normalized ! (hence the nn)
-  template<class in_class, unsigned _lu_depth>
-void  inline FastGaussianNoise<in_class, _lu_depth>::nn_gaussian_law(mpfr_t rop, const mpfr_t x) 
+  template<class in_class, class out_class, unsigned _lu_depth>
+void  inline FastGaussianNoise<in_class, out_class, _lu_depth>::nn_gaussian_law(mpfr_t rop, const mpfr_t x) 
 {
   mpfr_sub(rop, x, _center, MPFR_RNDN);
   mpfr_sqr(rop, rop, MPFR_RNDN);
@@ -631,8 +630,8 @@ void  inline FastGaussianNoise<in_class, _lu_depth>::nn_gaussian_law(mpfr_t rop,
 }
 
 
-  template<class in_class, unsigned _lu_depth>
-FastGaussianNoise<in_class, _lu_depth>::~FastGaussianNoise() 
+  template<class in_class, class out_class, unsigned _lu_depth>
+FastGaussianNoise<in_class, out_class, _lu_depth>::~FastGaussianNoise() 
 {
   // Freed allocated memory for the barriers
   for (unsigned ctr = 0; ctr < _number_of_barriers; ctr++)
