@@ -1,10 +1,11 @@
 #include "yell/poly.hpp"
-constexpr size_t Deg = 2048;
-constexpr size_t NdM = 8;
+#include "yell/utils/timer.hpp"
+constexpr size_t Deg = 8192;
+constexpr size_t NdM = 4;
 
 namespace global {
-  using gauss_struct = yell::gaussian<uint16_t, 2>;
-  using gauss_t = yell::FastGaussianNoise<uint16_t, 2>;
+  using gauss_struct = yell::gaussian<uint16_t, yell::params::value_type, 2>;
+  using gauss_t = yell::FastGaussianNoise<uint16_t, yell::params::value_type, 2>;
   gauss_t fg_prng(3.2, 128, 1 << 14);
 }
 
