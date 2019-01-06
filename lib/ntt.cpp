@@ -172,6 +172,7 @@ void negacylic_forward_lazy(
   }
   //! x[0 .. degree) stay in the range [0, 4p)
 }
+
 void negacylic_backward_lazy(
   params::value_type *x, 
   const size_t degree,
@@ -179,11 +180,6 @@ void negacylic_backward_lazy(
   const params::value_type *wtab_shoup,
   const params::value_type p)
 {
-#ifndef YELL_USE_AVX_NTT
-  constexpr size_t guard = 3;
-#else
-  constexpr size_t guard = 7;
-#endif
   ntt_loop_body body(p);
   size_t t = 1;
   for (size_t m = degree; m > 2; m >>= 1u) { //! 'm > 2' to skip the last layer.
@@ -191,7 +187,7 @@ void negacylic_backward_lazy(
     size_t j1 = 0;
     const params::value_type *w = &wtab[h];
     const params::value_type *wshoup = &wtab_shoup[h];
-    if (t > guard) { 
+    if (t > YELL_NTT_UNROOL_SIZE) { 
       for (size_t i = 0; i != h; ++i) {
         const size_t j2 = j1 + t;
         auto x0 = &x[j1];
@@ -205,10 +201,10 @@ void negacylic_backward_lazy(
           body.gs_bufferfly(x0++, x1++, w[i], wshoup[i]);
         }
 #else
-        for (size_t j = j1; j != j2; j += 8) {
+        for (size_t j = j1; j != j2; j += YELL_AVX_BATCH_SIZE) {
           body.avx_gs_bufferfly(x0, x1, w[i], wshoup[i]);
-          x0 += 8;
-          x1 += 8;
+          x0 += YELL_AVX_BATCH_SIZE;
+          x1 += YELL_AVX_BATCH_SIZE;
         }
 #endif
         j1 = j1 + (t << 1u);

@@ -1,8 +1,9 @@
+#include "yell/defines.h"
 #include "yell/utils/mem.hpp"
 #include <stdlib.h>
 namespace yell {
 
-#ifndef YELL_NTT_AVX
+#ifndef YELL_USE_AVX_NTT
 
 void * mem_alloc(size_t bytes) {
   void* res = malloc(bytes);
