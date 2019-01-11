@@ -1,6 +1,5 @@
 #include "yell/avx2.h"
-#include <immintrin.h>
-
+#ifdef YELL_USE_AVX_NTT
 __m256i avx_mm256_mul64_hi(__m256i const& A, __m256i const& B)
 {
   //! A := A_hi * 2^32 + A_lo;
@@ -83,5 +82,6 @@ __m256i avx_mm256_mul32_hi(__m256i A, __m256i B)
   const __m256i mulhigh = _mm256_mul_epu32(A, B);
   return reinterpret_cast<__m256i>(_mm256_blend_ps(reinterpret_cast<__m256>(mullow), 
                                                    reinterpret_cast<__m256>(mulhigh), 0b10101010));
-}
 
+}
+#endif
