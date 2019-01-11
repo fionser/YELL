@@ -1,4 +1,4 @@
-#pragma once
+#include "yell/montgomery.hpp"
 #include "yell/ops.hpp"
 #include "yell/utils/math.hpp"
 

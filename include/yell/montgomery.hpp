@@ -72,5 +72,3 @@ public:
   static const mot_precomputed* init_table(size_t cm);
 };
 } // namespace yell
-
-#include "yell/details/montgomery.hpp"
