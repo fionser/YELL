@@ -7,7 +7,7 @@
 #endif
 
 #ifndef YELL_USE_AVX
-#define YELL_NTT_UNROOL_SIZE 3
+#define YELL_NTT_UNROOL_SIZE 1
 #else
 #define YELL_NTT_UNROOL_SIZE (YELL_AVX_BATCH_SIZE - 1)
 #endif

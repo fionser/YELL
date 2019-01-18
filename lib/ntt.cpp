@@ -52,13 +52,13 @@ struct ntt_loop_body {
                            value_type const w, 
                            value_type const wprime) const
   {
-    value_type u0 = *x0;
     value_type u1 = *x1;
+    value_type u0 = *x0;
 
-    u0 -= mod_correct_table[u0 < _2p]; // if (u0 >= 2p) u0 -= 2p;
     value_type q = ((gt_value_type) u1 * (wprime)) >> params::kModulusRepresentationBitsize;
     value_type t = u1 * w - q * p;
 
+    u0 -= mod_correct_table[u0 < _2p]; // if (u0 >= 2p) u0 -= 2p;
     *x0 = u0 + t;
     *x1 = u0 - t + _2p;
   }
@@ -140,19 +140,15 @@ void negacylic_forward_lazy(
     const params::value_type *wshoup = &wtab_shoup[m];
     if (t > YELL_NTT_UNROOL_SIZE) {
       for (size_t i = 0; i != m; ++i) {
-        const size_t j1 = 2 * i * t;
-        const size_t j2 = j1 + t;
-        auto x0 = &x[j1];
-        auto x1 = &x[j2];
+        auto x0 = &x[2 * i * t];
+        auto x1 = &x[2 * i * t + t];
 #ifndef YELL_USE_AVX_NTT
-        for (size_t j = j1; j != j2; j += 4) {
-          body.ct_bufferfly(x0++, x1++, w[i], wshoup[i]);
-          body.ct_bufferfly(x0++, x1++, w[i], wshoup[i]);
+        for (size_t j = 0; j != t; j += 2) {
           body.ct_bufferfly(x0++, x1++, w[i], wshoup[i]);
           body.ct_bufferfly(x0++, x1++, w[i], wshoup[i]);
         }
 #else
-        for (size_t j = j1; j != j2; j += YELL_AVX_BATCH_SIZE) {
+        for (size_t j = 0; j != t; j += YELL_AVX_BATCH_SIZE) {
           body.avx_ct_bufferfly(x0, x1, w[i], wshoup[i]);
           x0 += YELL_AVX_BATCH_SIZE;
           x1 += YELL_AVX_BATCH_SIZE;
@@ -161,11 +157,9 @@ void negacylic_forward_lazy(
       }
     } else { //! last two layers
       for (size_t i = 0; i != m; ++i) {
-        const size_t j1 = 2 * i * t;
-        const size_t j2 = j1 + t;
-        auto x0 = &x[j1];
-        auto x1 = &x[j2];
-        for (size_t j = j1; j != j2; ++j)
+        auto x0 = &x[2 * i * t];
+        auto x1 = &x[2 * i * t + t];
+        for (size_t j = 0; j != t; ++j)
           body.ct_bufferfly(x0++, x1++, w[i], wshoup[i]);
       }
     }
@@ -189,19 +183,16 @@ void negacylic_backward_lazy(
     const params::value_type *wshoup = &wtab_shoup[h];
     if (t > YELL_NTT_UNROOL_SIZE) { 
       for (size_t i = 0; i != h; ++i) {
-        const size_t j2 = j1 + t;
         auto x0 = &x[j1];
-        auto x1 = &x[j2];
+        auto x1 = &x[j1 + t];
 #ifndef YELL_USE_AVX_NTT
         //! Unroll a little bit to reduce the number of branches.
-        for (size_t j = j1; j != j2; j += 4) {
-          body.gs_bufferfly(x0++, x1++, w[i], wshoup[i]);
-          body.gs_bufferfly(x0++, x1++, w[i], wshoup[i]);
+        for (size_t j = 0; j != t; j += 2) {
           body.gs_bufferfly(x0++, x1++, w[i], wshoup[i]);
           body.gs_bufferfly(x0++, x1++, w[i], wshoup[i]);
         }
 #else
-        for (size_t j = j1; j != j2; j += YELL_AVX_BATCH_SIZE) {
+        for (size_t j = 0; j != t; j += YELL_AVX_BATCH_SIZE) {
           body.avx_gs_bufferfly(x0, x1, w[i], wshoup[i]);
           x0 += YELL_AVX_BATCH_SIZE;
           x1 += YELL_AVX_BATCH_SIZE;
@@ -211,10 +202,9 @@ void negacylic_backward_lazy(
       }
     } else { //! first two layers
       for (size_t i = 0; i != h; ++i) {
-        const size_t j2 = j1 + t;
         auto x0 = &x[j1];
-        auto x1 = &x[j2];
-        for (size_t j = j1; j != j2; ++j)
+        auto x1 = &x[j1 + t];
+        for (size_t j = 0; j != t; ++j)
           body.gs_bufferfly(x0++, x1++, w[i], wshoup[i]);
         j1 = j1 + (t << 1u);
       }

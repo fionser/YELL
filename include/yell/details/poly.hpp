@@ -62,8 +62,6 @@ poly<degree>::operator=(poly const& oth)
 template<size_t degree>
 poly<degree>::poly(poly && oth) : poly(0) {
   swap(*this, oth);
-  // nmoduli(oth.nmoduli), _data(oth._data) {
-  // oth.clear();
 }
 
 template<size_t degree>

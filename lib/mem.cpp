@@ -3,13 +3,13 @@
 #include <stdlib.h>
 namespace yell {
 
-#ifndef YELL_USE_AVX_NTT
-
-void * mem_alloc(size_t bytes) {
-  void* res = malloc(bytes);
-  return res;
-}
-#else
+// #ifndef YELL_USE_AVX_NTT
+//
+// void * mem_alloc(size_t bytes) {
+//   void* res = malloc(bytes);
+//   return res;
+// }
+// #else
 
 void * mem_alloc(size_t bytes) {
   void* res;
@@ -17,7 +17,7 @@ void * mem_alloc(size_t bytes) {
   if (failed) res = 0;
   return res;
 }
-#endif
+//#endif
 
 void mem_free(void *p) {
   if (p) free(p);
