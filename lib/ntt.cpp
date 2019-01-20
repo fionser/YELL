@@ -2,6 +2,8 @@
 #include "yell/params.hpp"
 #include <iostream>
 #include <array>
+#include <immintrin.h>
+
 namespace yell {
 //! return a < p ? a : a - p where p < 2^w
 template <typename T>
@@ -63,11 +65,9 @@ struct ntt_loop_body {
     value_type u0 = *x0;
     value_type u1 = *x1;
 
-    value_type q = ((gt_value_type) u1 * (wprime)) >> bit_width;
-    value_type t = u1 * w - q * p;
-
-    //u0 = mod_correct(u0, _2p, bit_width);
     u0 -= mod_correct_table[u0 < _2p]; //! if (u0 >= 2p) u0 -= 2p;
+    value_type q = ((gt_value_type) u1 * wprime) >> bit_width;
+    value_type t = u1 * w - q * p;
     *x0 = u0 + t;
     *x1 = u0 - t + _2p;
   }
@@ -131,6 +131,9 @@ struct ntt_loop_body {
 };
 
 #ifndef YELL_USE_AVX_NTT
+//! x in given in standard order.
+//! wtab is the powers of 2*degree primitive root in the bit-reversed order.
+//! e.g., w^{2 * degree} = 1 \bmod p
 void negacylic_forward_lazy(
   params::value_type *x, 
   const size_t degree,
@@ -139,28 +142,18 @@ void negacylic_forward_lazy(
   const params::value_type p)
 {
   ntt_loop_body body(p);
-  size_t t = degree;
+  size_t h = degree >> 1u;
   for (size_t m = 1; m < degree; m <<= 1) {
-    t >>= 1u;
     const params::value_type *w = &wtab[m];
     const params::value_type *wshoup = &wtab_shoup[m];
-    if (t > 1) {
-      for (size_t i = 0; i != m; ++i) {
-        auto x0 = &x[2 * i * t];
-        auto x1 = x0 + t;
-        for (size_t j = 0; j != t; j += 2) {
-          body.ct_butterfly(x0++, x1++, w[i], wshoup[i]);
-          body.ct_butterfly(x0++, x1++, w[i], wshoup[i]);
-        }
-      }
-    } else { //! last two layers
-      for (size_t i = 0; i != m; ++i) {
-        auto x0 = &x[2 * i * t];
-        auto x1 = x0 + t;
-        for (size_t j = 0; j != t; ++j)
-          body.ct_butterfly(x0++, x1++, w[i], wshoup[i]);
-      }
+    //! the number of NTTs is m where each in size of 2 * h
+    for (size_t r = 0; r < m; ++r) {
+      auto x0 = &x[2 * h * r]; 
+      auto x1 = x0 + h; 
+      for (size_t i = 0; i < h; ++i)
+        body.ct_butterfly(x0++, x1++, w[r], wshoup[r]);
     }
+    h >>= 1u;
   }
   //! x[0 .. degree) stay in the range [0, 4p)
 }
@@ -176,27 +169,13 @@ void negacylic_backward_lazy(
   size_t t = 1;
   for (size_t m = degree; m > 2; m >>= 1u) { //! 'm > 2' to skip the last layer.
     const size_t h = m >> 1u;
-    size_t j1 = 0;
     const params::value_type *w = &wtab[h];
     const params::value_type *wshoup = &wtab_shoup[h];
-    if (t > 1) { 
-      for (size_t i = 0; i < h; ++i) {
-        auto x0 = &x[j1];
-        auto x1 = x0 + t;
-        for (size_t j = 0; j < t; j += 2) {
-          body.gs_butterfly(x0++, x1++, w[i], wshoup[i]);
-          body.gs_butterfly(x0++, x1++, w[i], wshoup[i]);
-        }
-        j1 = j1 + (t << 1u);
-      }
-    } else { //! first two layers
-      for (size_t i = 0; i < h; ++i) {
-        auto x0 = &x[j1];
-        auto x1 = x0 + t;
-        for (size_t j = 0; j < t; ++j)
-          body.gs_butterfly(x0++, x1++, w[i], wshoup[i]);
-        j1 = j1 + (t << 1u);
-      }
+    for (size_t i = 0; i < h; ++i) {
+      auto x0 = &x[2 * t * i];
+      auto x1 = x0 + t;
+      for (size_t j = 0; j < t; ++j)
+        body.gs_butterfly(x0++, x1++, w[i], wshoup[i]);
     }
     t <<= 1u;
   }
