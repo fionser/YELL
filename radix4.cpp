@@ -163,7 +163,6 @@ void negacylic_forward_lazy(
         auto w3p = wtab_shoup[3 * i * m];
         body.run(x0++, x1++, x2++, x3++, w1, w1p, w2, w2p, w3, w3p);
       }
-      // std::cout << "-----\n";
     }
     h >>= 2u;
   }
@@ -207,7 +206,7 @@ void prep_wtab(T *wtab, T *wtab_shoup, size_t n, T w, size_t cm)
   }
 }
 
-int main() {
+int main(int argc, char *argv[]) {
   constexpr size_t degree = 16384;
   T w[degree], wprime[degree], invw[degree], tmp[degree + 1];
   auto tbl = yell::ntt<degree>::init_table(0);
@@ -235,6 +234,8 @@ int main() {
   }
 
   if (degree < 1024) {
+    auto _A(A);
+    auto dst = _A.ptr_at(0);
     for (int k = 0; k < A.degree; ++k) {
       T sum{A(0, 0)};
       T w_origin = w[k];
@@ -243,38 +244,25 @@ int main() {
         muladd.compute(sum, w_, A(0, i), 0);
         mulmod.compute(w_, w_origin, 0);
       }
-      std::cout << sum << " ";
+      *dst++ = sum;
     }
-    std::cout << "\n";
 
     negacylic_forward_lazy(A.ptr_at(0), A.degree, w, wprime, yell::params::P[0]);
-    std::cout << A << "\n";
-  }
-
-  double rd4 = 0., rd2 = 0.;
-
-  for (long i = 0; i < 1000; ++i) {
-    if (i & 1) {
-      {
-        AutoTimer timer(&rd2);
-        cpy.forward_lazy();
-      }
-      {
+    std::cout << "eq = " << (_A == A) << "\n";
+  } else {
+    double rd4 = 0., rd2 = 0.;
+    if (argc > 1) {
+      for (long i = 0; i < 1000; ++i) {
         AutoTimer timer(&rd4);
         negacylic_forward_lazy(A.ptr_at(0), A.degree, w, wprime, 0);
       }
     } else {
-      {
-        AutoTimer timer(&rd4);
-        negacylic_forward_lazy(A.ptr_at(0), A.degree, w, wprime, 0);
-      }
-      {
+      for (long i = 0; i < 1000; ++i) {
         AutoTimer timer(&rd2);
         cpy.forward_lazy();
       }
     }
+    std::cout << "rd4 : rd2\n";
+    std::cout << rd4 << " " << rd2 << "\n";
   }
-
-  std::cout << "rd4 : rd2\n";
-  std::cout << rd4 << " " << rd2 << "\n";
 }

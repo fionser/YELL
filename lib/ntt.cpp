@@ -146,10 +146,11 @@ void negacylic_forward_lazy(
   for (size_t m = 1; m < degree; m <<= 1) {
     const params::value_type *w = &wtab[m];
     const params::value_type *wshoup = &wtab_shoup[m];
-    //! the number of NTTs is m where each in size of 2 * h
+    //! different buttefly groups
     for (size_t r = 0; r < m; ++r) {
       auto x0 = &x[2 * h * r]; 
       auto x1 = x0 + h; 
+      //! buttefly group that use the same twiddle factor, i.e., w[r].
       for (size_t i = 0; i < h; ++i)
         body.ct_butterfly(x0++, x1++, w[r], wshoup[r]);
     }
