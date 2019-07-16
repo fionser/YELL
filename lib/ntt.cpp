@@ -18,12 +18,11 @@ struct ntt_loop_body {
   using gt_value_type = params::gt_value_type;
   const size_t bit_width = params::kModulusRepresentationBitsize;
   const value_type p, _2p;
-  const std::array<value_type, 2> mod_correct_table;
 #ifdef YELL_USE_AVX_NTT //! see yell/defines.h
   __m256i avx_2p, avx_p, avx_80, avx_2pcomp; 
 #endif
 
-  explicit ntt_loop_body(value_type const p) : p(p), _2p(p * 2), mod_correct_table({_2p, 0}) {
+  explicit ntt_loop_body(value_type const p) : p(p), _2p(p * 2) {
 #ifdef YELL_USE_AVX_NTT
     avx_2p = _mm256_set1_epi32(p << 1);
     avx_p  = _mm256_set1_epi32(p);
@@ -32,6 +31,12 @@ struct ntt_loop_body {
 #endif
   }
 
+  //! if (cond is true) return a else return b
+  inline value_type const_time_select(value_type a, value_type b, bool cond) const {
+      value_type c = -(value_type) cond;
+      value_type x = a ^ b;
+      return (x & c) ^ b;
+  }
   //! x'0 = x0 + x1 mod p
   //! x'1 = w * (x0 - x1) mod p
   //! Require: 0 < x0, x1 < 2 * p
@@ -45,7 +50,7 @@ struct ntt_loop_body {
     value_type u1 = *x1;
 
     value_type t0 = u0 + u1;
-    t0 -= mod_correct_table[t0 < _2p]; //! if (t0 >= _2p) t0 -= 2p;
+    t0 -= const_time_select(0, _2p, t0 < _2p); //! if (t0 >= _2p) t0 -= 2p;
     value_type t1 = u0 - u1 + _2p;
     value_type q = ((gt_value_type) t1 * wprime) >> bit_width;
 
@@ -65,7 +70,7 @@ struct ntt_loop_body {
     value_type u0 = *x0;
     value_type u1 = *x1;
 
-    u0 -= mod_correct_table[u0 < _2p]; //! if (u0 >= 2p) u0 -= 2p;
+    u0 -= const_time_select(0, _2p, u0 < _2p); //! if (u0 >= 2p) u0 -= 2p;
     value_type q = ((gt_value_type) u1 * wprime) >> bit_width;
     value_type t = u1 * w - q * p;
     *x0 = u0 + t;
