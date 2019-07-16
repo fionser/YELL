@@ -90,6 +90,7 @@ public:
   bool operator!=(poly const& oth) const { return !(*this == oth); }
   // *this += op0 * op1. Use lazy reduction for a better performance.
   poly<degree_>& add_product_of(const poly<degree_>& op0, const poly<degree_>& op1);
+  poly<degree_>& mul_sensitive_poly(const poly<degree_>& sensitive_poly);
   void negate();
   // Resize the number of moduli. add / drop extra moduli.
   void resize_moduli_count(size_t nmoduli);

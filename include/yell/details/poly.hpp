@@ -131,6 +131,23 @@ poly<degree_>& poly<degree_>::add_product_of(const poly<degree_>& op0,
   return *this;
 }
 
+template<size_t degree_> 
+poly<degree_>& poly<degree_>::mul_sensitive_poly(const poly<degree_>& sensitive_poly)
+{
+  assert(nmoduli == sensitive_poly);
+  //! a * s -> a * r + a * (s - r)
+  poly<degree_> r0(nmoduli, uniform{});
+  poly<degree_> r1{sensitive_poly - r0};
+
+  r1 *= (*this); 
+  (*this) *= r0;
+  *this += r1;
+
+  r0.clear();
+  r1.clear();
+  return *this;
+}
+
 template <size_t degree_>
 void poly<degree_>::negate() {
   for (size_t cm = 0; cm < nmoduli; ++cm) {
