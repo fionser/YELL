@@ -15,7 +15,6 @@ include_directories(${GMP_INCLUDES} ${MPFR_INCLUDES})
 ## optional flags
 #add_definitions(-DYELL_USE_MEM_POOL)
 #add_definitions(-DYELL_USE_32BITS_MODULI)
-#add_definitions(-DYELL_USE_AVX)
 include_directories(include/)
 
 file(GLOB YELL_ASMC lib/prng/*.s)
