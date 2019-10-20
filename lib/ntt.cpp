@@ -46,7 +46,7 @@ struct ntt_loop_body {
     value_type q = ((gt_value_type) t1 * wprime) >> bit_width;
 
     //! w is in the div_2_mod_p form, so we need to handle x0 here.
-    *x0 = const_time_select((t0 + p) >> 1, t0 >> 1, t0 & 1); 
+    *x0 = const_time_select(t0 + p, t0, t0 & 1) >> 1;
     *x1 = t1 * w - q * p;
   }
 
@@ -86,12 +86,14 @@ void negacylic_forward_lazy(
     const params::value_type *w = &wtab[m];
     const params::value_type *wshoup = &wtab_shoup[m];
     //! different buttefly groups
+    auto x0 = x;
+    auto x1 = x0 + h;
     for (size_t r = 0; r < m; ++r) {
-      auto x0 = &x[2 * h * r]; 
-      auto x1 = x0 + h; 
       //! buttefly group that use the same twiddle factor, i.e., w[r].
       for (size_t i = 0; i < h; ++i)
         body.ct_butterfly(x0++, x1++, w[r], wshoup[r]);
+      x0 += h;
+      x1 = x0 + h;
     }
     h >>= 1u;
   }
@@ -111,11 +113,13 @@ void negacylic_backward_lazy(
     const size_t h = m >> 1u;
     const params::value_type *w = &wtab[h];
     const params::value_type *wshoup = &wtab_shoup[h];
+    auto x0 = x;
+    auto x1 = x0 + t;
     for (size_t i = 0; i < h; ++i) {
-      auto x0 = &x[2 * t * i];
-      auto x1 = x0 + t;
       for (size_t j = 0; j < t; ++j)
         body.gs_butterfly(x0++, x1++, w[i], wshoup[i]);
+      x0 += t;
+      x1 = x0 + t;
     }
     t <<= 1u;
   }

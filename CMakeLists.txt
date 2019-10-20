@@ -23,6 +23,8 @@ add_library(yell STATIC ${YELL_SRC} ${YELL_ASMC})
 
 add_executable(example example.cpp)
 target_link_libraries(example yell ${GMP_LIBRARIES} ${MPFR_LIBRARIES})
+add_executable(mont rescale.cc)
+target_link_libraries(mont yell ${GMP_LIBRARIES} ${MPFR_LIBRARIES})
 
 include_directories(${GMP_INCLUDES} ${MPFR_INCLUDES})
 
