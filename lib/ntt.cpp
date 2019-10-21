@@ -5,6 +5,23 @@
 #include <immintrin.h>
 
 namespace yell {
+
+struct var_time_selector {
+  using value_type = params::value_type;
+  static inline value_type select(value_type a, value_type b, bool cond) {
+    return cond ? a : b;
+  }
+};
+
+struct cnst_time_selector {
+  using value_type = params::value_type;
+  static inline value_type select(value_type a, value_type b, bool cond) {
+    value_type c = -(value_type) cond;
+    value_type x = a ^ b;
+    return (x & c) ^ b;
+  }
+};
+
 struct ntt_loop_body {
   using value_type = params::value_type;
   using signed_type = params::signed_type;
@@ -14,54 +31,26 @@ struct ntt_loop_body {
 
   explicit ntt_loop_body(value_type const p) : p(p), _2p(p * 2) { }
 
-  //! if (cond is true) return a else return b
-  inline value_type var_time_select(value_type a, value_type b, bool cond) const {
-    return cond ? a : b;
-  }
-
-  inline value_type cnst_time_select(value_type a, value_type b, bool cond) const {
-    value_type c = -(value_type) cond;
-    value_type x = a ^ b;
-    return (x & c) ^ b;
-  }
-
   //! x'0 = x0 + x1 mod p
   //! x'1 = w * (x0 - x1) mod p
   //! Require: 0 < x0, x1 < 2 * p
   //! Ensure:  0 < x'0, x'1 < 2 * p
-  inline void gs_butterfly_var_time(value_type* x0, 
-                                    value_type* x1, 
-                                    value_type const *w, 
-                                    value_type const *wprime) const
+  template <class Selector>
+  inline void gs_butterfly(value_type* x0, 
+                           value_type* x1, 
+                           value_type const *w, 
+                           value_type const *wprime) const
   {
     value_type u0 = *x0;
     value_type u1 = *x1;
 
     value_type t0 = u0 + u1;
-    t0 -= var_time_select(0, _2p, t0 < _2p); //! if (t0 >= _2p) t0 -= 2p;
+    t0 -= Selector::select(0, _2p, t0 < _2p); //! if (t0 >= _2p) t0 -= 2p;
     value_type t1 = u0 - u1 + _2p;
     value_type q = ((gt_value_type) t1 * (*wprime)) >> bit_width;
 
     //! w is in the div_2_mod_p form, so we need to handle x0 here.
-    *x0 = var_time_select(t0 + p, t0, t0 & 1) >> 1;
-    *x1 = t1 * (*w) - q * p;
-  }
-
-  inline void gs_butterfly_cnst_time(value_type* x0, 
-                                     value_type* x1, 
-                                     value_type const *w, 
-                                     value_type const *wprime) const
-  {
-    value_type u0 = *x0;
-    value_type u1 = *x1;
-
-    value_type t0 = u0 + u1;
-    t0 -= var_time_select(0, _2p, t0 < _2p); //! if (t0 >= _2p) t0 -= 2p;
-    value_type t1 = u0 - u1 + _2p;
-    value_type q = ((gt_value_type) t1 * (*wprime)) >> bit_width;
-
-    //! w is in the div_2_mod_p form, so we need to handle x0 here.
-    *x0 = cnst_time_select(t0 + p, t0, t0 & 1) >> 1;
+    *x0 = var_time_selector::select(t0 + p, t0, t0 & 1) >> 1;
     *x1 = t1 * (*w) - q * p;
   }
 
@@ -69,30 +58,16 @@ struct ntt_loop_body {
   //! x'1 = x0 - w * x1 mod p
   //! Require: 0 < x0, x1 < 4 * p
   //! Ensure:  0 < x'0, x'1 < 4 * p
-  inline void ct_butterfly_var_time(value_type* x0, 
-                                    value_type* x1, 
-                                    value_type const *w, 
-                                    value_type const *wprime) const
+  template <class Selector>
+  inline void ct_butterfly(value_type* x0, 
+                           value_type* x1, 
+                           value_type const *w, 
+                           value_type const *wprime) const
   {
     value_type u0 = *x0;
     value_type u1 = *x1;
 
-    u0 -= var_time_select(0, _2p, u0 < _2p); //! if (u0 >= 2p) u0 -= 2p;
-    value_type q = ((gt_value_type) u1 * (*wprime)) >> bit_width;
-    value_type t = u1 * (*w) - q * p;
-    *x0 = u0 + t;
-    *x1 = u0 - t + _2p;
-  }
-  
-  inline void ct_butterfly_cnst_time(value_type* x0, 
-                                     value_type* x1, 
-                                     value_type const *w, 
-                                     value_type const *wprime) const
-  {
-    value_type u0 = *x0;
-    value_type u1 = *x1;
-
-    u0 -= cnst_time_select(0, _2p, u0 < _2p); //! if (u0 >= 2p) u0 -= 2p;
+    u0 -= Selector::select(0, _2p, u0 < _2p); //! if (u0 >= 2p) u0 -= 2p;
     value_type q = ((gt_value_type) u1 * (*wprime)) >> bit_width;
     value_type t = u1 * (*w) - q * p;
     *x0 = u0 + t;
@@ -111,12 +86,8 @@ void negacylic_forward_lazy(
   const params::value_type p)
 {
   using T = params::value_type;
-  using sT = int64_t;
-  using gT = params::gt_value_type;
-
   ntt_loop_body body(p);
-  size_t h = degree >> 1u;
-  for (size_t m = 1; m < degree; m <<= 1) {
+  for (size_t m = 1, h = degree >> 1; m < degree; m <<= 1) {
     //! different buttefly groups
     const T* w = wtab + m;
     const T* wshoup = wtab_shoup + m;
@@ -126,10 +97,10 @@ void negacylic_forward_lazy(
       for (size_t r = 0; r < m; ++r, ++w, ++wshoup) {
         //! buttefly group that use the same twiddle factor, i.e., w[r].
         for (size_t i = 0; i < h; i += 4) {
-          body.ct_butterfly_var_time(x0++, x1++, w, wshoup);
-          body.ct_butterfly_var_time(x0++, x1++, w, wshoup);
-          body.ct_butterfly_var_time(x0++, x1++, w, wshoup);
-          body.ct_butterfly_var_time(x0++, x1++, w, wshoup);
+          body.ct_butterfly<var_time_selector>(x0++, x1++, w, wshoup);
+          body.ct_butterfly<var_time_selector>(x0++, x1++, w, wshoup);
+          body.ct_butterfly<var_time_selector>(x0++, x1++, w, wshoup);
+          body.ct_butterfly<var_time_selector>(x0++, x1++, w, wshoup);
         }
         x0 += h;
         x1 = x0 + h;
@@ -138,7 +109,7 @@ void negacylic_forward_lazy(
        for (size_t r = 0; r < m; ++r, ++w, ++wshoup) {
         //! buttefly group that use the same twiddle factor, i.e., w[r].
         for (size_t i = 0; i < h; ++i) {
-          body.ct_butterfly_cnst_time(x0++, x1++, w, wshoup);
+          body.ct_butterfly<cnst_time_selector>(x0++, x1++, w, wshoup);
         }
         x0 += h;
         x1 = x0 + h;
@@ -146,6 +117,7 @@ void negacylic_forward_lazy(
     }
     h >>= 1u; // invariant: h * m = degree / 2
   }
+
   //! x[0 .. degree) stay in the range [0, 4p)
 }
 
@@ -166,10 +138,10 @@ void negacylic_backward_lazy(
     if (h >= 4) {
       for (size_t r = 0; r < m; ++r, ++w, ++wshoup) {
         for (size_t i = 0; i < h; i += 4) {
-          body.gs_butterfly_var_time(x0++, x1++, w, wshoup);
-          body.gs_butterfly_var_time(x0++, x1++, w, wshoup);
-          body.gs_butterfly_var_time(x0++, x1++, w, wshoup);
-          body.gs_butterfly_var_time(x0++, x1++, w, wshoup);
+          body.gs_butterfly<var_time_selector>(x0++, x1++, w, wshoup);
+          body.gs_butterfly<var_time_selector>(x0++, x1++, w, wshoup);
+          body.gs_butterfly<var_time_selector>(x0++, x1++, w, wshoup);
+          body.gs_butterfly<var_time_selector>(x0++, x1++, w, wshoup);
         }
         x0 += h;
         x1 = x0 + h;
@@ -177,7 +149,7 @@ void negacylic_backward_lazy(
     } else {
       for (size_t r = 0; r < m; ++r, ++w, ++wshoup) {
         for (size_t i = 0; i < h; ++i) {
-          body.gs_butterfly_cnst_time(x0++, x1++, w, wshoup);
+          body.gs_butterfly<cnst_time_selector>(x0++, x1++, w, wshoup);
         }
         x0 += h;
         x1 = x0 + h;
