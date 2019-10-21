@@ -5,13 +5,6 @@
 #include <immintrin.h>
 
 namespace yell {
-//! return a < p ? a : a - p where p < 2^w
-template <typename T>
-inline T mod_correct(T a, const T p, const size_t w) {
-  a -= p;
-  return ((a >> (w - 1)) & p) + a;
-}
-
 struct ntt_loop_body {
   using value_type = params::value_type;
   using signed_type = params::signed_type;
