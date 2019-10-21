@@ -10,7 +10,10 @@ set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 find_package(GMP REQUIRED)
 find_package(MPFR REQUIRED)
+
 include_directories(${GMP_INCLUDES} ${MPFR_INCLUDES})
+
+set(RUNLIBS yell ${GMP_LIBRARIES} ${MPFR_LIBRARIES})
 
 ## optional flags
 #add_definitions(-DYELL_USE_MEM_POOL)
@@ -22,9 +25,31 @@ file(GLOB YELL_SRC lib/prng/*.cpp lib/*.cpp lib/prng/*.s)
 add_library(yell STATIC ${YELL_SRC} ${YELL_ASMC})
 
 add_executable(example example.cpp)
-target_link_libraries(example yell ${GMP_LIBRARIES} ${MPFR_LIBRARIES})
-add_executable(mont rescale.cc)
-target_link_libraries(mont yell ${GMP_LIBRARIES} ${MPFR_LIBRARIES})
+target_link_libraries(example ${RUNLIBS})
 
-include_directories(${GMP_INCLUDES} ${MPFR_INCLUDES})
+find_package(benchmark)
+include_directories(/Users/juhou/include)
+link_directories(/Users/juhou/lib)
+if(benchmark_FOUND)
+  link_directories(/usr/local/lib)
+  add_executable(benchmark_ntt benchmark_ntt.cc)
+  target_link_libraries(benchmark_ntt benchmark nfllib ${RUNLIBS})
+endif()
+
+find_package(GTest)
+
+if (GTEST_FOUND)
+
+macro(package_add_test TESTNAME)
+    add_executable(${TESTNAME} ${ARGN})
+    target_link_libraries(${TESTNAME} ${GTEST_LIBRARY} ${GTEST_MAIN_LIBRARIES} ${RUNLIBS})
+    add_test(NAME ${TESTNAME} COMMAND ${TESTNAME})
+endmacro()
+
+include_directories(${GTEST_INCLUDE_DIRS})
+enable_testing()
+
+#package_add_test(test_basic test/test_basic.cpp)
+
+endif()
 
