@@ -111,15 +111,20 @@ template <size_t degree>
 void ntt<degree>::forward(T *op, size_t cm)
 {
   forward_lazy(op, cm);
+
   const T p = params::P[cm];
-  T mod_table[2][2] = {{2 * p, 0}, 
-                       {    p, 0}};
-  std::transform(op, op + degree, op,
-                 [&mod_table, p](T v) { 
-                 v -= mod_table[0][v < 2 * p];
-                 v -= mod_table[1][v < p];
-                 return v;
+  const T _2p = p << 1;
+  auto cnst_time_select = [](T a, T b, bool cond) {
+    T c = -(T) cond;
+    T x = a ^ b;
+    return (x & c) ^ b;
+  };
+
+  std::transform(op, op + degree, op, [&cnst_time_select, p, _2p](T v) -> T {
+                 v -= cnst_time_select(0, _2p, v < _2p);
+                 return v - cnst_time_select(0, p, v < p);
                  });
+
 #ifndef NDEBUG
   for (size_t d = 0; d < degree; ++d)
     assert(op[d] < yell::params::P[cm]);
@@ -145,9 +150,17 @@ void ntt<degree>::backward(T *op, size_t cm)
   const T *invphiTbl = tbl->invphiTbl;
   const T *shoupInvphiTbl = tbl->shoupInvphiTbl;
   negacylic_backward_lazy(op, degree, invphiTbl, shoupInvphiTbl, params::P[cm]);
+
+  auto cnst_time_select = [](T a, T b, bool cond) {
+    T c = -(T) cond;
+    T x = a ^ b;
+    return (x & c) ^ b;
+  };
+
   const T p = params::P[cm];
-  T mod_table[2]{p, 0};
-  std::transform(op, op + degree, op, [&mod_table, p](T v) { return v - mod_table[v < p]; });
+  std::transform(op, op + degree, op, [p, &cnst_time_select](T v) { 
+                 return v - cnst_time_select(0, p, v < p);
+                 });
 #ifndef NDEBUG
   for (size_t d = 0; d < degree; ++d)
     assert(op[d] < yell::params::P[cm]);
