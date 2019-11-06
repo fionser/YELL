@@ -47,7 +47,7 @@ BENCHMARK_F(NTT, Forward)(benchmark::State& st) {
 
 BENCHMARK_F(NTT, Backward)(benchmark::State& st) {
     for (auto _ : st)
-        p1->forward();
+        p1->backward();
 }
 
 BENCHMARK_F(NTT, NFLib_Backward)(benchmark::State& st) {
