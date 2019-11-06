@@ -4,14 +4,16 @@
 #include <yell/poly.hpp>
 #include <nfl/poly.hpp>
 
+constexpr size_t NMod = 4;
 class NTT : public ::benchmark::Fixture {
 public:
     void SetUp(const ::benchmark::State& st) {
-        p0 = std::make_shared<yell::poly<Deg>>(4, yell::uniform{});
-        p1 = std::make_shared<yell::poly<Deg>>(4, yell::uniform{});
-        _p0 = std::make_shared<nfl::poly<uint64_t, Deg, 4>>();
-        _p1 = std::make_shared<nfl::poly<uint64_t, Deg, 4>>();
-        for (int cm = 0; cm < 4; ++cm) {
+        yell::ntt<Deg>::init_ntt_tables(NMod); // YELL compute the NTT tables on-fly
+        p0 = std::make_shared<yell::poly<Deg>>(NMod, yell::uniform{});
+        p1 = std::make_shared<yell::poly<Deg>>(NMod, yell::uniform{});
+        _p0 = std::make_shared<nfl::poly<uint64_t, Deg, NMod>>();
+        _p1 = std::make_shared<nfl::poly<uint64_t, Deg, NMod>>();
+        for (int cm = 0; cm < NMod; ++cm) {
             std::memcpy(_p0->begin() + Deg * cm, p0->cptr_at(cm), sizeof(uint64_t) * Deg);
             std::memcpy(_p1->begin() + Deg * cm, p1->cptr_at(cm), sizeof(uint64_t) * Deg);
         }
@@ -29,8 +31,8 @@ public:
     static constexpr size_t Deg = 8192;
     std::shared_ptr<yell::poly<Deg>> p0;
     std::shared_ptr<yell::poly<Deg>> p1;
-    std::shared_ptr<nfl::poly<uint64_t, Deg, 4>> _p0;
-    std::shared_ptr<nfl::poly<uint64_t, Deg, 4>> _p1;
+    std::shared_ptr<nfl::poly<uint64_t, Deg, NMod>> _p0;
+    std::shared_ptr<nfl::poly<uint64_t, Deg, NMod>> _p1;
 };
 
 BENCHMARK_F(NTT, NFLib_Forward)(benchmark::State& st) {
