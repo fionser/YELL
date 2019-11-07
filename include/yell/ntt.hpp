@@ -35,11 +35,12 @@ private:
     T phiTbl[degree],
       shoupPhiTbl[degree],
       invphiTbl[degree],
-      shoupInvphiTbl[degree];
-      // invDegree,
-      // shoupInvDegree,
-      // invphiInvDegree, //! n^{-1} * invphi, used in the last layer of inv_ntt
-      // shoupInvphiInvDegree;
+      shoupInvphiTbl[degree],
+
+      invDegree,
+      shoupInvDegree,
+      invphiInvDegree, //! n^{-1} * invphi, used in the last layer of inv_ntt
+      shoupInvphiInvDegree;
   };
 
   sf::contention_free_shared_mutex<> guard;

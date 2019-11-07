@@ -11,6 +11,10 @@ struct var_time_selector {
   static inline value_type select(value_type a, value_type b, bool cond) {
     return cond ? a : b;
   }
+
+  static inline value_type select0(value_type b, bool cond) {
+    return select(0, b, cond);
+  }
 };
 
 struct cnst_time_selector {
@@ -19,6 +23,10 @@ struct cnst_time_selector {
     value_type c = -(value_type) cond;
     value_type x = a ^ b;
     return (x & c) ^ b;
+  }
+
+  static inline value_type select0(value_type b, bool cond) {
+    return (b & -(value_type) cond) ^ b;
   }
 };
 
@@ -45,12 +53,11 @@ struct ntt_loop_body {
     value_type u1 = *x1;
 
     value_type t0 = u0 + u1;
-    t0 -= Selector::select(0, _2p, t0 < _2p); //! if (t0 >= _2p) t0 -= 2p;
+    t0 -= Selector::select0(_2p, t0 < _2p); //! if (t0 >= _2p) t0 -= 2p;
     value_type t1 = u0 - u1 + _2p;
     value_type q = ((gt_value_type) t1 * (*wprime)) >> bit_width;
 
-    //! w is in the div_2_mod_p form, so we need to handle x0 here.
-    *x0 = var_time_selector::select(t0 + p, t0, t0 & 1) >> 1;
+    *x0 = t0;
     *x1 = t1 * (*w) - q * p;
   }
 
@@ -67,7 +74,7 @@ struct ntt_loop_body {
     value_type u0 = *x0;
     value_type u1 = *x1;
 
-    u0 -= Selector::select(0, _2p, u0 < _2p); //! if (u0 >= 2p) u0 -= 2p;
+    u0 -= Selector::select0(_2p, u0 < _2p); //! if (u0 >= 2p) u0 -= 2p;
     value_type q = ((gt_value_type) u1 * (*wprime)) >> bit_width;
     value_type t = u1 * (*w) - q * p;
     *x0 = u0 + t;
@@ -87,37 +94,55 @@ void negacylic_forward_lazy(
 {
   using T = params::value_type;
   ntt_loop_body body(p);
-  for (size_t m = 1, h = degree >> 1; m < degree; m <<= 1) {
-    //! different buttefly groups
+  size_t m = 1;
+  size_t h = degree >> 1;
+  { // main loop: for h >= 4
+    for (; h > 2; m <<= 1, h >>= 1) {
+      //! invariant: h * m = degree / 2
+      //! different buttefly groups
+      const T* w = wtab + m;
+      const T* wshoup = wtab_shoup + m;
+      auto x0 = x;
+      auto x1 = x0 + h; // invariant: x1 = x0 + h during the iteration
+      for (size_t r = 0; r < m; ++r, ++w, ++wshoup) {
+        //! buttefly group that use the same twiddle factor, i.e., w[r].
+        for (size_t i = 0; i < h; i += 4) { // unrolling
+          body.ct_butterfly<var_time_selector>(x0++, x1++, w, wshoup);
+          body.ct_butterfly<var_time_selector>(x0++, x1++, w, wshoup);
+          body.ct_butterfly<var_time_selector>(x0++, x1++, w, wshoup);
+          body.ct_butterfly<var_time_selector>(x0++, x1++, w, wshoup);
+        }
+        x0 += h;
+        x1 += h;
+      }
+    }
+  }
+
+  { // m = degree / 4, h = 2
     const T* w = wtab + m;
     const T* wshoup = wtab_shoup + m;
     auto x0 = x;
-    auto x1 = x0 + h; // invariant: x1 = x0 + h during the iteration
-    if (h >= 4) { // unroll the for-loop
-      for (size_t r = 0; r < m; ++r, ++w, ++wshoup) {
-        //! buttefly group that use the same twiddle factor, i.e., w[r].
-        for (size_t i = 0; i < h; i += 4) {
-          body.ct_butterfly<var_time_selector>(x0++, x1++, w, wshoup);
-          body.ct_butterfly<var_time_selector>(x0++, x1++, w, wshoup);
-          body.ct_butterfly<var_time_selector>(x0++, x1++, w, wshoup);
-          body.ct_butterfly<var_time_selector>(x0++, x1++, w, wshoup);
-        }
-        x0 += h;
-        x1 = x0 + h;
-      }
-    } else {
-       for (size_t r = 0; r < m; ++r, ++w, ++wshoup) {
-        //! buttefly group that use the same twiddle factor, i.e., w[r].
-        for (size_t i = 0; i < h; ++i) {
-          body.ct_butterfly<cnst_time_selector>(x0++, x1++, w, wshoup);
-        }
-        x0 += h;
-        x1 = x0 + h;
-      }
+    auto x1 = x0 + 2;
+    for (size_t r = 0; r < m; ++r, ++w, ++wshoup) { // unrolling
+      body.ct_butterfly<var_time_selector>(x0++, x1++, w, wshoup);
+      body.ct_butterfly<var_time_selector>(x0, x1, w, wshoup); // combine the incr to following steps
+      x0 += 3;
+      x1 += 3;
     }
-    h >>= 1u; // invariant: h * m = degree / 2
+    m <<= 1;
   }
 
+  { // m = degree / 2, h = 1
+    const T* w = wtab + m;
+    const T* wshoup = wtab_shoup + m;
+    auto x0 = x;
+    auto x1 = x0 + 1;
+    for (size_t r = 0; r < m; ++r, ++w, ++wshoup) {
+      body.ct_butterfly<cnst_time_selector>(x0, x1, w, wshoup);
+      x0 += 2;
+      x1 += 2;
+    }
+  }
   //! x[0 .. degree) stay in the range [0, 4p)
 }
 
@@ -129,33 +154,56 @@ void negacylic_backward_lazy(
   const params::value_type p)
 {
   ntt_loop_body body(p);
+  //! invariant: h * m = degree / 2
+  size_t m = degree >> 1;
   size_t h = 1;
-  for (size_t m = degree >> 1; m > 0; m >>= 1u) {
+
+  { // first loop: m = degree / 2, h = 1
     const params::value_type *w = wtab + m;
     const params::value_type *wshoup = wtab_shoup + m;
     auto x0 = x;
-    auto x1 = x0 + h; // invariant: x1 = x0 + h during the iteration
-    if (h >= 4) {
+    auto x1 = x0 + 1; // invariant: x1 = x0 + h during the iteration
+    for (size_t r = 0; r < m; ++r, ++w, ++wshoup) {
+      body.gs_butterfly<cnst_time_selector>(x0, x1, w, wshoup);
+      x0 += 2;
+      x1 += 2;
+    }
+  }
+
+  { // second loop: m = degree / 4, h = 2
+    m >>= 1;
+    h <<= 1;
+    const params::value_type *w = wtab + m;
+    const params::value_type *wshoup = wtab_shoup + m;
+    auto x0 = x;
+    auto x1 = x0 + 2; 
+    for (size_t r = 0; r < m; ++r, ++w, ++wshoup) {
+      body.gs_butterfly<cnst_time_selector>(x0++, x1++, w, wshoup);
+      body.gs_butterfly<cnst_time_selector>(x0, x1, w, wshoup); // combine the incr to following steps
+      x0 += 3;
+      x1 += 3;
+    }
+  }
+
+  { // main loop: for h >= 4
+    m >>= 1;
+    h <<= 1;
+    for (; m > 1; m >>= 1, h <<= 1) { // ! m > 1 to skip the last layer
+      const params::value_type *w = wtab + m;
+      const params::value_type *wshoup = wtab_shoup + m;
+      auto x0 = x;
+      auto x1 = x0 + h; 
       for (size_t r = 0; r < m; ++r, ++w, ++wshoup) {
-        for (size_t i = 0; i < h; i += 4) {
+        for (size_t i = 0; i < h; i += 4) { // unrolling
           body.gs_butterfly<var_time_selector>(x0++, x1++, w, wshoup);
           body.gs_butterfly<var_time_selector>(x0++, x1++, w, wshoup);
           body.gs_butterfly<var_time_selector>(x0++, x1++, w, wshoup);
           body.gs_butterfly<var_time_selector>(x0++, x1++, w, wshoup);
         }
         x0 += h;
-        x1 = x0 + h;
-      }
-    } else {
-      for (size_t r = 0; r < m; ++r, ++w, ++wshoup) {
-        for (size_t i = 0; i < h; ++i) {
-          body.gs_butterfly<cnst_time_selector>(x0++, x1++, w, wshoup);
-        }
-        x0 += h;
-        x1 = x0 + h;
+        x1 += h;
       }
     }
-    h <<= 1u; // invariant: h * m = degree / 2
   }
   //! x[0 .. degree) stay in the range [0, 2p)
 }

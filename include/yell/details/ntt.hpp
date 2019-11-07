@@ -4,6 +4,7 @@
 #include "yell/ops.hpp"
 #include "yell/meta.hpp"
 #include "yell/params.hpp"
+#include "yell/utils/math.hpp"
 namespace yell {
 //! @see lib/ntt.cpp
 void negacylic_forward_lazy(
@@ -57,27 +58,22 @@ void ntt<degree>::ntt_precomputed::init(size_t cm) {
   const T invphi = mulmod(temp, phiTbl[degree - 1], cm);
 
   const T prime = yell::params::P[cm];
-  auto div_2_mod_p = [](T v, T p) { return v & 1 ?  (v + p) >> 1 : v >> 1; };
   temp = 1;
   for (unsigned int i = 0 ; i < degree; i++) {
-    invphiTbl[i] = div_2_mod_p(temp, prime);
     shoupInvphiTbl[i] = ops::shoupify(invphiTbl[i], cm);
     mulmod.compute(temp, invphi, cm);
   }
 
   // Bit-reverse phi and inv_phi
-  params::value_type tmp[degree + 1];
-  permute<degree>::compute(tmp, phiTbl);
-  std::memcpy(phiTbl, tmp, sizeof(phiTbl));
+  math::revbin_permute(phiTbl, degree);
+  math::revbin_permute(shoupPhiTbl, degree);
+  math::revbin_permute(invphiTbl, degree);
+  math::revbin_permute(shoupInvphiTbl, degree);
 
-  permute<degree>::compute(tmp, shoupPhiTbl);
-  std::memcpy(shoupPhiTbl, tmp, sizeof(shoupPhiTbl));
-
-  permute<degree>::compute(tmp, invphiTbl);
-  std::memcpy(invphiTbl, tmp, sizeof(invphiTbl));
-
-  permute<degree>::compute(tmp, shoupInvphiTbl);
-  std::memcpy(shoupInvphiTbl, tmp, sizeof(shoupInvphiTbl));
+  invDegree = math::inv_mod_prime(degree, cm); // n^{-1}
+  shoupInvDegree = ops::shoupify(invDegree, cm);
+  invphiInvDegree = mulmod(invDegree, invphiTbl[1], cm); // n^{-1} * w^{-1}
+  shoupInvphiInvDegree = ops::shoupify(invphiInvDegree, cm);
 }
 
 template<size_t degree> const typename ntt<degree>::ntt_precomputed* 
@@ -147,20 +143,26 @@ void ntt<degree>::backward(T *op, size_t cm)
 {
   assert(op && cm < params::kMaxNbModuli);
   const auto tbl = init_table(cm);
-  const T *invphiTbl = tbl->invphiTbl;
-  const T *shoupInvphiTbl = tbl->shoupInvphiTbl;
-  negacylic_backward_lazy(op, degree, invphiTbl, shoupInvphiTbl, params::P[cm]);
 
-  auto cnst_time_select = [](T a, T b, bool cond) {
-    T c = -(T) cond;
-    T x = a ^ b;
-    return (x & c) ^ b;
-  };
+  negacylic_backward_lazy(op, degree, tbl->invphiTbl, tbl->shoupInvphiTbl, params::P[cm]);
 
-  const T p = params::P[cm];
-  std::transform(op, op + degree, op, [p, &cnst_time_select](T v) { 
-                 return v - cnst_time_select(0, p, v < p);
-                 });
+  const T _2p          = params::P[cm] << 1;
+  const T invN         = tbl->invDegree;
+  const T invN_s       = tbl->shoupInvDegree;
+  const T invNInvphi   = tbl->invphiInvDegree;
+  const T invNInvPhi_s = tbl->shoupInvphiInvDegree;
+  //! Merge the n^{-1} into the last layer of intt, which saves N/2 point-wise multiplications.
+  yell::ops::mulmod_shoup mulmod_s;
+  T *x0 = op;
+  T *x1 = op + degree / 2;
+  T const* end = x1;
+  while (x0 != end) {
+    T u = *x0;
+    T v = *x1;
+    *x0++ = mulmod_s(u + v, invN, invN_s, cm);
+    *x1++ = mulmod_s(u - v + _2p, invNInvphi, invNInvPhi_s, cm);
+  }
+
 #ifndef NDEBUG
   for (size_t d = 0; d < degree; ++d)
     assert(op[d] < yell::params::P[cm]);

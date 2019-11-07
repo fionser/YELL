@@ -26,6 +26,22 @@ inline T round(F a)
   return a >= 0 ? (T)(a + 0.5f) : (T) (a - 0.5f);
 }
 
+template <typename T>
+void revbin_permute(T *array, int length) {
+  if (!array || length <= 2) return;
+  for (int i = 1, j = 0; i < length; ++i) {
+    int bit = length >> 1;
+    for (; j >= bit; bit >>= 1) {
+      j -= bit;
+    }
+    j += bit;
+
+    if (i < j) {
+      std::swap(array[i], array[j]);
+    }
+  }
+}
+
 /* Reverse 32-bit */
 uint32_t reverse_bits(uint32_t operand);
 uint32_t reverse_bits(uint32_t operand, int32_t bit_count);
