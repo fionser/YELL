@@ -46,7 +46,7 @@ void ntt<degree>::ntt_precomputed::init(size_t cm) {
   // Initialized to phi**0
   temp = 1;
   for (unsigned int i = 0 ; i < degree; i++) {
-    phiTbl[i] = temp;
+    phiTbl[i]      = temp;
     shoupPhiTbl[i] = ops::shoupify(temp, cm);
     // phi**(i+1)
     mulmod.compute(temp, phi, cm);
@@ -56,10 +56,10 @@ void ntt<degree>::ntt_precomputed::init(size_t cm) {
   // Computation of invphi
   // phi^(2*degree) = 1 -> temp * phi^(degree-1) = phi^(-1)
   const T invphi = mulmod(temp, phiTbl[degree - 1], cm);
-
-  const T prime = yell::params::P[cm];
+  const T prime  = yell::params::P[cm];
   temp = 1;
   for (unsigned int i = 0 ; i < degree; i++) {
+    invphiTbl[i]      = temp;
     shoupInvphiTbl[i] = ops::shoupify(invphiTbl[i], cm);
     mulmod.compute(temp, invphi, cm);
   }
@@ -70,10 +70,10 @@ void ntt<degree>::ntt_precomputed::init(size_t cm) {
   math::revbin_permute(invphiTbl, degree);
   math::revbin_permute(shoupInvphiTbl, degree);
 
-  invDegree = math::inv_mod_prime(degree, cm); // n^{-1}
-  shoupInvDegree = ops::shoupify(invDegree, cm);
-  invphiInvDegree = mulmod(invDegree, invphiTbl[1], cm); // n^{-1} * w^{-1}
-  shoupInvphiInvDegree = ops::shoupify(invphiInvDegree, cm);
+  invDegree            = math::inv_mod_prime(degree, cm);
+  invphiInvDegree      = mulmod(invDegree, invphiTbl[1], cm);
+  shoupInvDegree       = yell::ops::shoupify(invDegree, cm);
+  shoupInvphiInvDegree = yell::ops::shoupify(invphiInvDegree, cm);
 }
 
 template<size_t degree> const typename ntt<degree>::ntt_precomputed* 
@@ -107,20 +107,15 @@ template <size_t degree>
 void ntt<degree>::forward(T *op, size_t cm)
 {
   forward_lazy(op, cm);
-
   const T p = params::P[cm];
-  const T _2p = p << 1;
-  auto cnst_time_select = [](T a, T b, bool cond) {
-    T c = -(T) cond;
-    T x = a ^ b;
-    return (x & c) ^ b;
-  };
-
-  std::transform(op, op + degree, op, [&cnst_time_select, p, _2p](T v) -> T {
-                 v -= cnst_time_select(0, _2p, v < _2p);
-                 return v - cnst_time_select(0, p, v < p);
+  T mod_table[2][2] = {{2 * p, 0}, 
+                       {    p, 0}};
+  std::transform(op, op + degree, op,
+                 [&mod_table, p](T v) { 
+                 v -= mod_table[0][v < 2 * p];
+                 v -= mod_table[1][v < p];
+                 return v;
                  });
-
 #ifndef NDEBUG
   for (size_t d = 0; d < degree; ++d)
     assert(op[d] < yell::params::P[cm]);
@@ -146,21 +141,21 @@ void ntt<degree>::backward(T *op, size_t cm)
 
   negacylic_backward_lazy(op, degree, tbl->invphiTbl, tbl->shoupInvphiTbl, params::P[cm]);
 
-  const T _2p          = params::P[cm] << 1;
-  const T invN         = tbl->invDegree;
-  const T invN_s       = tbl->shoupInvDegree;
-  const T invNInvphi   = tbl->invphiInvDegree;
-  const T invNInvPhi_s = tbl->shoupInvphiInvDegree;
-  //! Merge the n^{-1} into the last layer of intt, which saves N/2 point-wise multiplications.
   yell::ops::mulmod_shoup mulmod_s;
+  const T invN = tbl->invDegree;
+  const T invN_s = tbl->shoupInvDegree;
+  const T invNinvPhi = tbl->invphiInvDegree;
+  const T invNinvPhi_s = tbl->shoupInvphiInvDegree;
+  const T _2p = yell::params::P[cm] << 1;
+
   T *x0 = op;
   T *x1 = op + degree / 2;
-  T const* end = x1;
-  while (x0 != end) {
-    T u = *x0;
-    T v = *x1;
-    *x0++ = mulmod_s(u + v, invN, invN_s, cm);
-    *x1++ = mulmod_s(u - v + _2p, invNInvphi, invNInvPhi_s, cm);
+  T const* end = op + degree;
+  while (x1 != end) {
+      T u = *x0;
+      T v = *x1;
+      *x0++ = mulmod_s(u + v, invN, invN_s, cm);
+      *x1++ = mulmod_s(u - v + _2p, invNinvPhi, invNinvPhi_s, cm);
   }
 
 #ifndef NDEBUG

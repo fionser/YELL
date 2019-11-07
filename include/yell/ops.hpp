@@ -2,6 +2,7 @@
 #include "yell/params.hpp"
 #include <cassert>
 #include <cstddef>
+#include <type_traits>
 namespace yell {
 #define YELL_BINARY_OPERATOR(Op, Name) \
 template<size_t degree> \
