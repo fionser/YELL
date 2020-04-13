@@ -61,7 +61,8 @@ struct addmod {
 
   inline void compute(T &x, T y, size_t cm) const {
     auto const p = params::P[cm];
-    assert(x < p && y < p);
+    assert(x < p); 
+    assert(y < p);
     x += y;
     mod_correct(x, p);
   }
@@ -99,6 +100,8 @@ struct submod {
 void barret_reduction(params::gt_value_type *x, size_t cm);
 
 yell::params::value_type shoupify(yell::params::value_type x, size_t cm);
+
+yell::params::value_type shoupify_p(yell::params::value_type x, yell::params::value_type p);
 
 struct mulmod {
   using T = typename params::value_type;
@@ -141,6 +144,48 @@ struct mulmod_shoup {
   }
 };
 
+struct mulmod_mont {
+  using T = typename params::value_type;
+  using gT = typename params::gt_value_type;
+
+  T m;
+  explicit mulmod_mont(T m) : m(m) { }
+
+  T operator()(T a, T b, size_t cm) const {
+    T p = params::P[cm];
+    gT t = static_cast<gT>(a) * b;
+    T u = static_cast<T>(t) * m;
+    gT c = static_cast<gT>(u) * p + t;
+    T r = static_cast<T>(c >> params::kModulusRepresentationBitsize);
+    mod_correct(r, p);
+    return r;
+  }
+};
+
+struct muladd_mont {
+  using T = typename params::value_type;
+  using gT = typename params::gt_value_type;
+
+  T m;
+  explicit muladd_mont(T m) : m(m) { }
+
+  inline T operator()(T rop, T x, T y, size_t cm) const {
+    compute(rop, x, y, cm);
+    return rop;
+  }
+
+  inline void compute(T &rop, T a, T b, size_t cm) const {
+    T p = params::P[cm];
+    gT t = static_cast<gT>(a) * b;
+    T u = static_cast<T>(t) * m;
+    gT c = static_cast<gT>(u) * p + t;
+    T r = static_cast<T>(c >> params::kModulusRepresentationBitsize);
+    mod_correct(r, p);
+    rop += r;
+    mod_correct(rop, p);
+  }
+};
+
 struct muladd {
   using T = typename params::value_type;
   using gt_value_type = typename params::gt_value_type;
@@ -156,5 +201,6 @@ struct muladd {
     rop = (T) res;
   }
 };
+
 } // namespace ops
 } // namespace yell

@@ -115,18 +115,30 @@ void poly<degree_>::clear() {
     std::fill(ptr_at(cm), ptr_end(cm), 0);
 }
 
+static uint64_t compute_montgomery(const uint64_t p) {
+  uint64_t e = -(1UL << 63U) - 1; // Z/(2^64)Z^* has a multiplicative order of (2^64 - 2^63)
+  uint64_t a = -p, r = 1;
+  while(e > 0) {
+    if(e & 1U) r *= a;
+    a *= a;
+    e >>= 1U;
+  }
+  return r;
+}
+
 template<size_t degree_> 
 poly<degree_>& poly<degree_>::add_product_of(const poly<degree_>& op0, 
                                              const poly<degree_>& op1)
 {
   assert(nmoduli == op0.nmoduli && nmoduli == op1.nmoduli);
-  ops::muladd muladd;
   for (size_t cm = 0; cm < nmoduli; ++cm) {
+    ops::muladd_mont muladd(compute_montgomery(params::P[cm]));
     auto dst  = ptr_at(cm);
     auto op0_ = op0.cptr_at(cm);
     auto op1_ = op1.cptr_at(cm);
-    for (size_t d = 0; d < degree_; ++d)
+    for (size_t d = 0; d < degree_; ++d) {
       muladd.compute(*dst++, *op0_++, *op1_++, cm);
+    }
   }
   return *this;
 }

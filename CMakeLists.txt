@@ -18,13 +18,14 @@ set(RUNLIBS yell ${GMP_LIBRARIES} ${MPFR_LIBRARIES})
 ## optional flags
 #add_definitions(-DYELL_USE_MEM_POOL)
 #add_definitions(-DYELL_USE_32BITS_MODULI)
+add_definitions(-DYELL_MONTGOMERY_NTT)
 include_directories(include/)
 
 file(GLOB YELL_ASMC lib/prng/*.s)
-file(GLOB YELL_SRC lib/prng/*.cpp lib/*.cpp lib/prng/*.s)
+file(GLOB YELL_SRC lib/prng/*.cpp lib/*.cpp lib/prng/*.s lib/*.cc)
 add_library(yell STATIC ${YELL_SRC} ${YELL_ASMC})
 
-add_executable(example example.cpp)
+add_executable(example my_example.cc)
 target_link_libraries(example ${RUNLIBS})
 
 find_package(benchmark)

@@ -1,7 +1,7 @@
 #include "yell/poly.hpp"
 #include "yell/utils/timer.hpp"
 constexpr size_t Deg = 8192;
-constexpr size_t NdM = 4;
+constexpr size_t NdM = 2;
 
 namespace global {
   using gauss_struct = yell::gaussian<uint16_t, yell::params::value_type, 2>;
@@ -40,11 +40,11 @@ struct CTXT {
     u.forward();
     bx.set(global::gauss_struct(&global::fg_prng));
     bx += msg;
-    bx.forward_lazy();
+    bx.forward();
     bx.add_product_of(u, pk.bx);
 
     ax.set(global::gauss_struct(&global::fg_prng));
-    ax.forward_lazy();
+    ax.forward();
     ax.add_product_of(u, pk.ax);
   }
 };
@@ -57,17 +57,65 @@ void decrypt(yell::poly<Deg> *rop, CTXT const& ctx, SK const& sk)
   rop->backward();
 }
 
+static uint64_t compute_montgomery(const uint64_t p) {
+  uint64_t e = -(1UL << 63U) - 1; // Z/(2^64)Z^* has a multiplicative order of (2^64 - 2^63)
+  uint64_t a = -p, r = 1;
+  while(e > 0) {
+    if(e & 1U) r *= a;
+    a *= a;
+    e >>= 1U;
+  }
+  return r;
+}
+
 int main() {
-  SK sk;
-  PK pk(sk);
-  yell::poly<Deg> msg(NdM, yell::uniform{});
+  double btime{0.}, mtime{0.};
 
-  CTXT ctx(msg, pk);
-  yell::poly<Deg> plain(NdM);
-  auto coeffs = plain.poly2mpz();
+  for (int _i = 0; _i < 100; _i++) {
+    yell::poly<Deg> c0(NdM, yell::uniform{});
+    yell::poly<Deg> c1(NdM, yell::uniform{});
 
-  decrypt(&plain, ctx, sk);
+    yell::poly<Deg> c2(NdM);
 
-  std::cout << msg(0, 0) << " " << plain(0, 0) << "\n";
+    for (size_t cm = 0; cm < c2.moduli_count(); ++cm) {
+      AutoTimer timer(&btime);
+      yell::ops::mulmod mulmod;
+      auto op0 = c0.cptr_at(cm);
+      auto op1 = c1.cptr_at(cm);
+      auto dst = c2.ptr_at(cm);
+      for (size_t d = 0; d < Deg; ++d) {
+        *dst++ = mulmod(*op0++, *op1++, cm);
+      }
+    }
+
+    yell::poly<Deg> c3(NdM);
+    for (size_t cm = 0; cm < c2.moduli_count(); ++cm) {
+      uint64_t m = compute_montgomery(yell::params::P[cm]);
+      AutoTimer timer(&mtime);
+      yell::ops::mulmod_mont mulmod(m);
+      auto op0 = c0.cptr_at(cm);
+      auto op1 = c1.cptr_at(cm);
+      auto dst = c3.ptr_at(cm);
+      for (size_t d = 0; d < Deg; ++d) {
+        *dst++ = mulmod(*op0++, *op1++, cm);
+      }
+    }
+  }
+
+  std::cout << btime << " " << mtime << "\n";
+
+  {
+    SK sk;
+    PK pk(sk);
+    yell::poly<Deg> msg(NdM, yell::uniform{});
+
+    CTXT ctx(msg, pk);
+    yell::poly<Deg> plain(NdM);
+    auto coeffs = plain.poly2mpz();
+
+    decrypt(&plain, ctx, sk);
+
+    std::cout << msg(0, 0) << " " << plain(0, 0) << "\n";
+  }
   return 0;
 }

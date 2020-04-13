@@ -38,9 +38,7 @@ private:
       shoupInvphiTbl[degree],
 
       invDegree,
-      shoupInvDegree,
-      invphiInvDegree, //! n^{-1} * invphi, used in the last layer of inv_ntt
-      shoupInvphiInvDegree;
+      shoupInvDegree;
   };
 
   sf::contention_free_shared_mutex<> guard;
@@ -63,6 +61,9 @@ public:
   /* apply backward invntt over the specified moduli
    */
   static void backward(T* op ,size_t cm);
+  //! skip the final modulus correction step.
+  //! Result range in [0, 2 * p)
+  static void backward_lazy(T* op ,size_t cm);
 };
 } // namespace yell
 

@@ -26,4 +26,10 @@ yell::params::value_type shoupify(yell::params::value_type x, size_t cm)
   return ((gT) x << params::kModulusRepresentationBitsize) / params::P[cm];
 }
 
+yell::params::value_type shoupify_p(yell::params::value_type x, yell::params::value_type p)
+{
+  using gT = params::gt_value_type;
+  return ((gT) x << params::kModulusRepresentationBitsize) / p;
+}
+
 }} // namespace yell::ops
